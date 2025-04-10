@@ -23,7 +23,9 @@ services:
     # command: python -m src.sharepoint_uploader
 
   web:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: photo-web
     volumes:
       # Маунтируем для сохранения данных между запусками

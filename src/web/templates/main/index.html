@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block page_content %}
+{% block content %}
 <div class="row">
     <div class="col-md-12">
         <h1>Dashboard</h1>
@@ -124,8 +124,6 @@
 </div>
 {% endblock %}
 
-{% block scripts %}
-{{super()}}
 <script>
     // Auto-refresh dashboard stats every 30 seconds
     function refreshStats() {
@@ -142,10 +140,9 @@
             }
         });
     }
-    
+
     $(document).ready(function() {
         // Refresh stats every 30 seconds
         setInterval(refreshStats, 30000);
     });
 </script>
-{% endblock %}
