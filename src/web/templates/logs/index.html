@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1>Logs</h1>
+        <p>View and manage system logs.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-3">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-file-alt"></i> Log Files</h5>
+            </div>
+            <div class="card-body">
+                {% if log_files %}
+                <div class="list-group">
+                    {% for log_file in log_files %}
+                    <a href="{{ url_for('logs.index', file=log_file.name) }}" class="list-group-item list-group-item-action {% if selected_log == log_file.name %}active{% endif %}">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1 text-truncate" style="max-width: 80%;" title="{{ log_file.name }}">{{ log_file.name }}</h6>
+                            <small>{{ log_file.size|filesize }}</small>
+                        </div>
+                        <small>{{ log_file.modified|datetime }}</small>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted">No log files found.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-cogs"></i> Log Management</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('logs.rotate') }}" method="post">
+                    <div class="form-group">
+                        <label for="max_days">Max Age (days)</label>
+                        <input type="number" class="form-control" id="max_days" name="max_days" value="30" min="1" max="365">
+                        <small class="form-text text-muted">Logs older than this will be deleted.</small>
+                    </div>
+                    <button type="submit" class="btn btn-warning btn-block" onclick="return confirm('Are you sure you want to rotate logs? This will delete old log files.');">
+                        <i class="fas fa-sync"></i> Rotate Logs
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-clipboard-list"></i> Log Content</h5>
+                {% if selected_log %}
+                <div>
+                    <a href="{{ url_for('logs.download_log', filename=selected_log) }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-download"></i> Download
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-body p-0">
+                {% if selected_log %}
+                <div class="log-container" style="max-height: 600px; overflow-y: auto;">
+                    {% if log_entries %}
+                    {% for entry in log_entries %}
+                    <div class="log-entry {% if entry.level == 'ERROR' %}log-entry-error{% elif entry.level == 'WARNING' %}log-entry-warning{% elif entry.level == 'INFO' %}log-entry-info{% elif entry.level == 'DEBUG' %}log-entry-debug{% endif %}">
+                        {% if entry.timestamp %}
+                        <small class="text-muted">{{ entry.timestamp|datetime }}</small>
+                        {% if entry.module %}<small class="text-primary ml-2">{{ entry.module }}</small>{% endif %}
+                        {% if entry.level %}<small class="{% if entry.level == 'ERROR' %}text-danger{% elif entry.level == 'WARNING' %}text-warning{% elif entry.level == 'INFO' %}text-info{% elif entry.level == 'DEBUG' %}text-secondary{% endif %} ml-2">{{ entry.level }}</small>{% endif %}
+                        <div>{{ entry.message }}</div>
+                        {% else %}
+                        <div>{{ entry.message }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="p-3">
+                        <p class="text-muted">Log file is empty.</p>
+                    </div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="p-3">
+                    <p class="text-muted">Select a log file to view its content.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+<script>
+    $(document).ready(function() {
+        // Scroll to bottom of log container
+        var logContainer = $('.log-container');
+        if (logContainer.length) {
+            logContainer.scrollTop(logContainer[0].scrollHeight);
+        }
+    });
+</script>

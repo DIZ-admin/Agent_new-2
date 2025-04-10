@@ -216,14 +216,40 @@ def view_photo(filename):
     """View a photo."""
     path_manager = get_path_manager()
 
+    # Логируем запрос для отладки
+    logger.info(f"Запрос на просмотр фото: {filename}")
+    logger.info(f"Пути поиска: downloads_dir={path_manager.downloads_dir}, analysis_dir={path_manager.analysis_dir}, upload_dir={path_manager.upload_dir}, uploaded_dir={path_manager.uploaded_dir}")
+
+    # Проверяем существование директорий
+    for dir_name, dir_path in {
+        'downloads_dir': path_manager.downloads_dir,
+        'analysis_dir': path_manager.analysis_dir,
+        'upload_dir': path_manager.upload_dir,
+        'uploaded_dir': path_manager.uploaded_dir
+    }.items():
+        if not os.path.exists(dir_path):
+            logger.warning(f"Директория {dir_name} не существует: {dir_path}")
+        else:
+            logger.info(f"Директория {dir_name} существует: {dir_path}")
+            # Выводим список файлов в директории
+            files = os.listdir(dir_path)
+            logger.info(f"Файлы в {dir_name}: {files}")
+
     # Determine which directory the file is in
     if os.path.exists(os.path.join(path_manager.downloads_dir, filename)):
+        logger.info(f"Фото найдено в downloads_dir: {filename}")
         return send_from_directory(path_manager.downloads_dir, filename)
+    elif os.path.exists(os.path.join(path_manager.analysis_dir, filename)):
+        logger.info(f"Фото найдено в analysis_dir: {filename}")
+        return send_from_directory(path_manager.analysis_dir, filename)
     elif os.path.exists(os.path.join(path_manager.upload_dir, filename)):
+        logger.info(f"Фото найдено в upload_dir: {filename}")
         return send_from_directory(path_manager.upload_dir, filename)
     elif os.path.exists(os.path.join(path_manager.uploaded_dir, filename)):
+        logger.info(f"Фото найдено в uploaded_dir: {filename}")
         return send_from_directory(path_manager.uploaded_dir, filename)
     else:
+        logger.warning(f"Фото не найдено: {filename}")
         flash(f"File not found: {filename}", "danger")
         return redirect(url_for('photos.index'))
 
