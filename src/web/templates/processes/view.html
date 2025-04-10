@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1>Process Details</h1>
+        <p>
+            <a href="{{ url_for('processes.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Processes
+            </a>
+        </p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle"></i> Process Information</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-striped">
+                    <tbody>
+                        <tr>
+                            <th>PID</th>
+                            <td>{{ process.pid }}</td>
+                        </tr>
+                        <tr>
+                            <th>Name</th>
+                            <td>{{ process.name }}</td>
+                        </tr>
+                        <tr>
+                            <th>Status</th>
+                            <td id="process-status">
+                                {% if process.status == 'running' %}
+                                <span class="badge badge-info">Running</span>
+                                {% elif process.status == 'starting' %}
+                                <span class="badge badge-primary">Starting</span>
+                                {% elif process.status == 'finished' %}
+                                <span class="badge badge-success">Finished</span>
+                                {% elif process.status == 'error' %}
+                                <span class="badge badge-danger">Error</span>
+                                {% elif process.status == 'killed' %}
+                                <span class="badge badge-warning">Killed</span>
+                                {% else %}
+                                <span class="badge badge-secondary">{{ process.status }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Start Time</th>
+                            <td>{{ process.start_time_formatted }}</td>
+                        </tr>
+                        <tr>
+                            <th>Duration</th>
+                            <td id="process-duration">{{ process.duration }}</td>
+                        </tr>
+                        <tr>
+                            <th>Last Updated</th>
+                            <td id="process-last-updated">{{ process.last_updated_formatted }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                {% if process.status == 'running' or process.status == 'starting' %}
+                <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#killProcessModal">
+                    <i class="fas fa-stop"></i> Kill Process
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-cogs"></i> Process Details</h5>
+            </div>
+            <div class="card-body">
+                {% if process.details %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody id="process-details">
+                            {% for key, value in process.details.items() %}
+                            <tr>
+                                <td>{{ key }}</td>
+                                <td>
+                                    {% if value is mapping %}
+                                    <pre>{{ value|tojson(indent=2) }}</pre>
+                                    {% elif value is iterable and value is not string %}
+                                    <ul class="list-unstyled mb-0">
+                                        {% for item in value %}
+                                        <li>{{ item }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                    {% else %}
+                                    {{ value }}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">No additional details available.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if process.status == 'running' or process.status == 'starting' %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-line"></i> Process Progress</h5>
+            </div>
+            <div class="card-body">
+                {% if process.details and process.details.progress is defined %}
+                <div class="progress mb-3">
+                    <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: {{ process.details.progress }}%;" aria-valuenow="{{ process.details.progress }}" aria-valuemin="0" aria-valuemax="100">{{ process.details.progress }}%</div>
+                </div>
+                {% if process.details.progress_message is defined %}
+                <p id="progress-message" class="text-muted">{{ process.details.progress_message }}</p>
+                {% endif %}
+                {% else %}
+                <p class="text-muted">No progress information available.</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Kill Process Modal -->
+<div class="modal fade" id="killProcessModal" tabindex="-1" role="dialog" aria-labelledby="killProcessModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="killProcessModalLabel">Kill Process</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to kill this process? This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <form action="{{ url_for('processes.kill_process', pid=process.pid) }}" method="post">
+                    <button type="submit" class="btn btn-danger">Kill Process</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // Auto-refresh process details every 2 seconds
+        {% if process.status == 'running' or process.status == 'starting' %}
+        setInterval(refreshProcess, 2000);
+        {% endif %}
+        
+        function refreshProcess() {
+            $.ajax({
+                url: '{{ url_for("processes.process_status", pid=process.pid) }}',
+                type: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    // Update status
+                    var statusHtml = '';
+                    if (data.status === 'running') {
+                        statusHtml = '<span class="badge badge-info">Running</span>';
+                    } else if (data.status === 'starting') {
+                        statusHtml = '<span class="badge badge-primary">Starting</span>';
+                    } else if (data.status === 'finished') {
+                        statusHtml = '<span class="badge badge-success">Finished</span>';
+                        // Reload page to show finished state
+                        location.reload();
+                    } else if (data.status === 'error') {
+                        statusHtml = '<span class="badge badge-danger">Error</span>';
+                        // Reload page to show error state
+                        location.reload();
+                    } else if (data.status === 'killed') {
+                        statusHtml = '<span class="badge badge-warning">Killed</span>';
+                        // Reload page to show killed state
+                        location.reload();
+                    } else {
+                        statusHtml = '<span class="badge badge-secondary">' + data.status + '</span>';
+                    }
+                    
+                    $('#process-status').html(statusHtml);
+                    
+                    // Update duration
+                    $('#process-duration').text(data.duration);
+                    
+                    // Update last updated
+                    $('#process-last-updated').text(data.last_updated_formatted);
+                    
+                    // Update progress if available
+                    if (data.details && data.details.progress !== undefined) {
+                        $('#progress-bar').css('width', data.details.progress + '%');
+                        $('#progress-bar').attr('aria-valuenow', data.details.progress);
+                        $('#progress-bar').text(data.details.progress + '%');
+                        
+                        if (data.details.progress_message !== undefined) {
+                            $('#progress-message').text(data.details.progress_message);
+                        }
+                    }
+                    
+                    // Update details
+                    if (data.details) {
+                        var detailsHtml = '';
+                        for (var key in data.details) {
+                            var value = data.details[key];
+                            detailsHtml += '<tr><td>' + key + '</td><td>';
+                            
+                            if (typeof value === 'object') {
+                                detailsHtml += '<pre>' + JSON.stringify(value, null, 2) + '</pre>';
+                            } else {
+                                detailsHtml += value;
+                            }
+                            
+                            detailsHtml += '</td></tr>';
+                        }
+                        
+                        $('#process-details').html(detailsHtml);
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

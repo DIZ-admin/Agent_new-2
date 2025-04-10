@@ -6,6 +6,7 @@ This module provides the main views for the web interface.
 
 import os
 import subprocess
+import time
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from datetime import datetime
 
@@ -13,6 +14,7 @@ from src.utils.config import get_config
 from src.utils.logging import get_logger
 from src.utils.paths import get_path_manager
 from src.utils.registry import get_registry
+from src.utils.process_tracker import get_process_tracker
 
 # Get logger
 logger = get_logger('web.main')
@@ -94,9 +96,26 @@ def run_script(script):
     try:
         # Run the script in a subprocess
         module = valid_scripts[script]
-        subprocess.Popen(['python', '-m', module],
+        process = subprocess.Popen(['python', '-m', module],
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE)
+
+        # Get process tracker
+        process_tracker = get_process_tracker()
+
+        # Add process to tracker
+        process_tracker.add_process(
+            pid=process.pid,
+            name=script,
+            start_time=time.time(),
+            status="running",
+            details={
+                "module": module,
+                "started_by": "web",
+                "progress": 0,
+                "progress_message": "Starting process..."
+            }
+        )
 
         flash(f"Started {script} process", "success")
         logger.info(f"Started {script} process via web interface")

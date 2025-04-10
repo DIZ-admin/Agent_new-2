@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1>Processes</h1>
+        <p>View and manage running processes.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-tasks"></i> Running Processes</h5>
+                <div>
+                    <button id="refreshProcesses" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if processes %}
+                <div class="table-responsive">
+                    <table class="table table-striped" id="processesTable">
+                        <thead>
+                            <tr>
+                                <th>PID</th>
+                                <th>Name</th>
+                                <th>Status</th>
+                                <th>Start Time</th>
+                                <th>Duration</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pid, process in processes.items() %}
+                            <tr data-pid="{{ pid }}" class="process-row {% if process.status == 'running' %}table-info{% elif process.status == 'finished' %}table-success{% elif process.status == 'error' %}table-danger{% elif process.status == 'killed' %}table-warning{% endif %}">
+                                <td>{{ process.pid }}</td>
+                                <td>{{ process.name }}</td>
+                                <td>
+                                    <span class="process-status">
+                                        {% if process.status == 'running' %}
+                                        <span class="badge badge-info">Running</span>
+                                        {% elif process.status == 'starting' %}
+                                        <span class="badge badge-primary">Starting</span>
+                                        {% elif process.status == 'finished' %}
+                                        <span class="badge badge-success">Finished</span>
+                                        {% elif process.status == 'error' %}
+                                        <span class="badge badge-danger">Error</span>
+                                        {% elif process.status == 'killed' %}
+                                        <span class="badge badge-warning">Killed</span>
+                                        {% else %}
+                                        <span class="badge badge-secondary">{{ process.status }}</span>
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td>{{ process.start_time_formatted }}</td>
+                                <td class="process-duration">{{ process.duration }}</td>
+                                <td>
+                                    <a href="{{ url_for('processes.view_process', pid=pid) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
+                                    {% if process.status == 'running' or process.status == 'starting' %}
+                                    <button type="button" class="btn btn-sm btn-outline-danger kill-process" data-pid="{{ pid }}" data-toggle="modal" data-target="#killProcessModal">
+                                        <i class="fas fa-stop"></i> Kill
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">No processes found.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Kill Process Modal -->
+<div class="modal fade" id="killProcessModal" tabindex="-1" role="dialog" aria-labelledby="killProcessModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="killProcessModalLabel">Kill Process</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to kill this process? This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <form id="killProcessForm" action="" method="post">
+                    <button type="submit" class="btn btn-danger">Kill Process</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // Auto-refresh processes every 5 seconds
+        setInterval(refreshProcesses, 5000);
+        
+        // Manual refresh button
+        $('#refreshProcesses').click(function() {
+            refreshProcesses();
+        });
+        
+        // Kill process modal
+        $('.kill-process').click(function() {
+            var pid = $(this).data('pid');
+            $('#killProcessForm').attr('action', '{{ url_for("processes.kill_process", pid="") }}' + pid);
+        });
+        
+        function refreshProcesses() {
+            $.ajax({
+                url: '{{ url_for("processes.active") }}',
+                type: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    // Update existing rows
+                    for (var pid in data) {
+                        var process = data[pid];
+                        var row = $('tr[data-pid="' + pid + '"]');
+                        
+                        if (row.length) {
+                            // Update status
+                            var statusHtml = '';
+                            if (process.status === 'running') {
+                                statusHtml = '<span class="badge badge-info">Running</span>';
+                                row.removeClass('table-success table-danger table-warning').addClass('table-info');
+                            } else if (process.status === 'starting') {
+                                statusHtml = '<span class="badge badge-primary">Starting</span>';
+                                row.removeClass('table-success table-danger table-warning').addClass('table-info');
+                            } else if (process.status === 'finished') {
+                                statusHtml = '<span class="badge badge-success">Finished</span>';
+                                row.removeClass('table-info table-danger table-warning').addClass('table-success');
+                            } else if (process.status === 'error') {
+                                statusHtml = '<span class="badge badge-danger">Error</span>';
+                                row.removeClass('table-info table-success table-warning').addClass('table-danger');
+                            } else if (process.status === 'killed') {
+                                statusHtml = '<span class="badge badge-warning">Killed</span>';
+                                row.removeClass('table-info table-success table-danger').addClass('table-warning');
+                            } else {
+                                statusHtml = '<span class="badge badge-secondary">' + process.status + '</span>';
+                            }
+                            
+                            row.find('.process-status').html(statusHtml);
+                            
+                            // Update duration
+                            row.find('.process-duration').text(process.duration);
+                        } else {
+                            // Add new row
+                            location.reload();
+                        }
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

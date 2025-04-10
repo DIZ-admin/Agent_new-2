@@ -49,11 +49,12 @@ def create_app(test_config=None):
         pass
 
     # Register blueprints
-    from .views import main, photos, settings, logs
+    from .views import main, photos, settings, logs, processes
     app.register_blueprint(main.bp)
-    app.register_blueprint(photos.bp)
-    app.register_blueprint(settings.bp)
-    app.register_blueprint(logs.bp)
+    app.register_blueprint(photos.bp, url_prefix='/photos')
+    app.register_blueprint(settings.bp, url_prefix='/settings')
+    app.register_blueprint(logs.bp, url_prefix='/logs')
+    app.register_blueprint(processes.bp, url_prefix='/processes')
 
     # Add template filters
     @app.template_filter('datetime')
