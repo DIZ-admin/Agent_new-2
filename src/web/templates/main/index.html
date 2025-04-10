@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block page_content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1>Dashboard</h1>
+        <p>Welcome to the ERNI Photo Processor web interface. This dashboard provides an overview of the system status and recent activity.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-3">
+        <div class="card dashboard-card">
+            <div class="icon text-primary">
+                <i class="fas fa-download"></i>
+            </div>
+            <div class="number">{{ downloads_count }}</div>
+            <div class="label">Photos in Downloads</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card dashboard-card">
+            <div class="icon text-success">
+                <i class="fas fa-brain"></i>
+            </div>
+            <div class="number">{{ analysis_count }}</div>
+            <div class="label">Analyzed Photos</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card dashboard-card">
+            <div class="icon text-warning">
+                <i class="fas fa-upload"></i>
+            </div>
+            <div class="number">{{ upload_count }}</div>
+            <div class="label">Ready for Upload</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card dashboard-card">
+            <div class="icon text-info">
+                <i class="fas fa-cloud-upload-alt"></i>
+            </div>
+            <div class="number">{{ uploaded_count }}</div>
+            <div class="label">Uploaded Photos</div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-play-circle"></i> Run Processes</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    <form action="{{ url_for('main.run_script', script='metadata_schema') }}" method="post" class="mb-2">
+                        <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                            <i class="fas fa-file-code"></i> Load Metadata Schema
+                        </button>
+                    </form>
+                    <form action="{{ url_for('main.run_script', script='photo_metadata') }}" method="post" class="mb-2">
+                        <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                            <i class="fas fa-download"></i> Download Photos
+                        </button>
+                    </form>
+                    <form action="{{ url_for('main.run_script', script='openai_analyzer') }}" method="post" class="mb-2">
+                        <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                            <i class="fas fa-brain"></i> Analyze Photos with OpenAI
+                        </button>
+                    </form>
+                    <form action="{{ url_for('main.run_script', script='metadata_generator') }}" method="post" class="mb-2">
+                        <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                            <i class="fas fa-tags"></i> Generate Metadata
+                        </button>
+                    </form>
+                    <form action="{{ url_for('main.run_script', script='sharepoint_uploader') }}" method="post" class="mb-2">
+                        <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                            <i class="fas fa-cloud-upload-alt"></i> Upload to SharePoint
+                        </button>
+                    </form>
+                    <form action="{{ url_for('main.run_script', script='auto_process') }}" method="post">
+                        <button type="submit" class="btn btn-success btn-block text-left">
+                            <i class="fas fa-play"></i> Run Full Process
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-history"></i> Recent Activity</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_activity %}
+                <div class="list-group">
+                    {% for activity in recent_activity %}
+                    <div class="list-group-item list-group-item-action">
+                        {% if activity.type == 'processed' %}
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1"><i class="fas fa-brain text-success"></i> Processed: {{ activity.filename }}</h6>
+                            <small>{{ activity.timestamp|datetime }}</small>
+                        </div>
+                        <small>Hash: {{ activity.info.hash[:8] }}...</small>
+                        {% elif activity.type == 'uploaded' %}
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1"><i class="fas fa-cloud-upload-alt text-primary"></i> Uploaded: {{ activity.filename }}</h6>
+                            <small>{{ activity.timestamp|datetime }}</small>
+                        </div>
+                        <small>SharePoint ID: {{ activity.info.sharepoint_id }}</small>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted">No recent activity found.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{super()}}
+<script>
+    // Auto-refresh dashboard stats every 30 seconds
+    function refreshStats() {
+        $.ajax({
+            url: "{{ url_for('main.status') }}",
+            type: "GET",
+            dataType: "json",
+            success: function(data) {
+                // Update stats
+                $(".dashboard-card").eq(0).find(".number").text(data.downloads_count);
+                $(".dashboard-card").eq(1).find(".number").text(data.analysis_count);
+                $(".dashboard-card").eq(2).find(".number").text(data.upload_count);
+                $(".dashboard-card").eq(3).find(".number").text(data.uploaded_count);
+            }
+        });
+    }
+    
+    $(document).ready(function() {
+        // Refresh stats every 30 seconds
+        setInterval(refreshStats, 30000);
+    });
+</script>
+{% endblock %}

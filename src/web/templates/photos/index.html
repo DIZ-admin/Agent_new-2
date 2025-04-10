@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% block page_content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1>Photos Management</h1>
+        <p>Manage photos in the ERNI Photo Processor system.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-upload"></i> Upload Photos</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('photos.upload') }}" method="post" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="photos">Select photos to upload:</label>
+                        <input type="file" class="form-control-file" id="photos" name="photos" multiple accept="image/*">
+                        <small class="form-text text-muted">You can select multiple photos. Supported formats: JPG, JPEG, PNG, GIF, BMP, TIFF, WEBP</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Upload</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <ul class="nav nav-tabs" id="photoTabs" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="downloads-tab" data-toggle="tab" href="#downloads" role="tab" aria-controls="downloads" aria-selected="true">
+                    <i class="fas fa-download"></i> Downloads ({{ downloads|length }})
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="analyzed-tab" data-toggle="tab" href="#analyzed" role="tab" aria-controls="analyzed" aria-selected="false">
+                    <i class="fas fa-brain"></i> Analyzed ({{ analyzed|length }})
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="upload-ready-tab" data-toggle="tab" href="#upload-ready" role="tab" aria-controls="upload-ready" aria-selected="false">
+                    <i class="fas fa-upload"></i> Ready for Upload ({{ upload_ready|length }})
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="uploaded-tab" data-toggle="tab" href="#uploaded" role="tab" aria-controls="uploaded" aria-selected="false">
+                    <i class="fas fa-cloud-upload-alt"></i> Uploaded ({{ uploaded|length }})
+                </a>
+            </li>
+        </ul>
+        <div class="tab-content" id="photoTabsContent">
+            <!-- Downloads Tab -->
+            <div class="tab-pane fade show active" id="downloads" role="tabpanel" aria-labelledby="downloads-tab">
+                <div class="card">
+                    <div class="card-body">
+                        {% if downloads %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Preview</th>
+                                        <th>Filename</th>
+                                        <th>Size</th>
+                                        <th>Modified</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for photo in downloads %}
+                                    <tr>
+                                        <td>
+                                            <a href="{{ url_for('photos.view_photo', filename=photo.name) }}" target="_blank">
+                                                <img src="{{ url_for('photos.view_photo', filename=photo.name) }}" class="photo-thumbnail" alt="{{ photo.name }}">
+                                            </a>
+                                        </td>
+                                        <td>{{ photo.name }}</td>
+                                        <td>{{ photo.size|filesize }}</td>
+                                        <td>{{ photo.modified|datetime }}</td>
+                                        <td>
+                                            <a href="{{ url_for('photos.view_photo', filename=photo.name) }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No photos found in downloads directory.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Analyzed Tab -->
+            <div class="tab-pane fade" id="analyzed" role="tabpanel" aria-labelledby="analyzed-tab">
+                <div class="card">
+                    <div class="card-body">
+                        {% if analyzed %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Preview</th>
+                                        <th>Filename</th>
+                                        <th>Size</th>
+                                        <th>Modified</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for photo in analyzed %}
+                                    <tr>
+                                        <td>
+                                            {% if photo.original_path %}
+                                            <a href="{{ photo.original_path }}" target="_blank">
+                                                <img src="{{ photo.original_path }}" class="photo-thumbnail" alt="{{ photo.name }}">
+                                            </a>
+                                            {% else %}
+                                            <div class="photo-thumbnail bg-light d-flex align-items-center justify-content-center">
+                                                <i class="fas fa-image text-muted"></i>
+                                            </div>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ photo.name }}</td>
+                                        <td>{{ photo.size|filesize }}</td>
+                                        <td>{{ photo.modified|datetime }}</td>
+                                        <td>
+                                            <a href="{{ url_for('photos.view_analysis', filename=photo.name) }}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-search"></i> View Analysis
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No analyzed photos found.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Ready for Upload Tab -->
+            <div class="tab-pane fade" id="upload-ready" role="tabpanel" aria-labelledby="upload-ready-tab">
+                <div class="card">
+                    <div class="card-body">
+                        {% if upload_ready %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Preview</th>
+                                        <th>Filename</th>
+                                        <th>Size</th>
+                                        <th>Modified</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for photo in upload_ready %}
+                                    <tr>
+                                        <td>
+                                            <a href="{{ url_for('photos.view_photo', filename=photo.name) }}" target="_blank">
+                                                <img src="{{ url_for('photos.view_photo', filename=photo.name) }}" class="photo-thumbnail" alt="{{ photo.name }}">
+                                            </a>
+                                        </td>
+                                        <td>{{ photo.name }}</td>
+                                        <td>{{ photo.size|filesize }}</td>
+                                        <td>{{ photo.modified|datetime }}</td>
+                                        <td>
+                                            <a href="{{ url_for('photos.view_photo', filename=photo.name) }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No photos ready for upload found.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Uploaded Tab -->
+            <div class="tab-pane fade" id="uploaded" role="tabpanel" aria-labelledby="uploaded-tab">
+                <div class="card">
+                    <div class="card-body">
+                        {% if uploaded %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Preview</th>
+                                        <th>Filename</th>
+                                        <th>Size</th>
+                                        <th>Modified</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for photo in uploaded %}
+                                    <tr>
+                                        <td>
+                                            <a href="{{ url_for('photos.view_photo', filename=photo.name) }}" target="_blank">
+                                                <img src="{{ url_for('photos.view_photo', filename=photo.name) }}" class="photo-thumbnail" alt="{{ photo.name }}">
+                                            </a>
+                                        </td>
+                                        <td>{{ photo.name }}</td>
+                                        <td>{{ photo.size|filesize }}</td>
+                                        <td>{{ photo.modified|datetime }}</td>
+                                        <td>
+                                            <a href="{{ url_for('photos.view_photo', filename=photo.name) }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No uploaded photos found.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

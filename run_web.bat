@@ -1,0 +1,3 @@
+@echo off
+echo Starting ERNI Photo Processor Web Interface...
+docker-compose up web

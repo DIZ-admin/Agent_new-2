@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block page_content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1>Photo Analysis</h1>
+        <p>
+            <a href="{{ url_for('photos.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Photos
+            </a>
+        </p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-image"></i> Original Photo</h5>
+            </div>
+            <div class="card-body text-center">
+                {% if original_path %}
+                <a href="{{ original_path }}" target="_blank">
+                    <img src="{{ original_path }}" class="img-fluid" alt="{{ filename }}">
+                </a>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> Original photo not found.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-brain"></i> Analysis Results</h5>
+            </div>
+            <div class="card-body">
+                {% if analysis %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Field</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for key, value in analysis.items() %}
+                            <tr>
+                                <td><strong>{{ key }}</strong></td>
+                                <td>
+                                    {% if value is mapping %}
+                                    <pre>{{ value|tojson(indent=2) }}</pre>
+                                    {% elif value is iterable and value is not string %}
+                                    <ul class="list-unstyled mb-0">
+                                        {% for item in value %}
+                                        <li>{{ item }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                    {% else %}
+                                    {{ value }}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> No analysis data found.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

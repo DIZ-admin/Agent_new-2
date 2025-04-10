@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block page_content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1>Settings</h1>
+        <p>Configure the ERNI Photo Processor system.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-cog"></i> System Settings</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('settings.update_env') }}" method="post">
+                    <h6 class="mb-3">SharePoint Settings</h6>
+                    <div class="form-group">
+                        <label for="SHAREPOINT_SITE_URL">SharePoint Site URL</label>
+                        <input type="text" class="form-control" id="SHAREPOINT_SITE_URL" name="SHAREPOINT_SITE_URL" value="{{ env_vars.SHAREPOINT_SITE_URL }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="SHAREPOINT_USERNAME">SharePoint Username</label>
+                        <input type="text" class="form-control" id="SHAREPOINT_USERNAME" name="SHAREPOINT_USERNAME" value="{{ env_vars.SHAREPOINT_USERNAME }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="SHAREPOINT_PASSWORD">SharePoint Password</label>
+                        <input type="password" class="form-control" id="SHAREPOINT_PASSWORD" name="SHAREPOINT_PASSWORD" placeholder="Leave blank to keep current password">
+                        <small class="form-text text-muted">Leave blank to keep the current password.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="SOURCE_LIBRARY_TITLE">Source Library Title</label>
+                        <input type="text" class="form-control" id="SOURCE_LIBRARY_TITLE" name="SOURCE_LIBRARY_TITLE" value="{{ env_vars.SOURCE_LIBRARY_TITLE }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="SHAREPOINT_LIBRARY">SharePoint Library</label>
+                        <input type="text" class="form-control" id="SHAREPOINT_LIBRARY" name="SHAREPOINT_LIBRARY" value="{{ env_vars.SHAREPOINT_LIBRARY }}">
+                    </div>
+                    
+                    <h6 class="mb-3 mt-4">OpenAI Settings</h6>
+                    <div class="form-group">
+                        <label for="OPENAI_API_KEY">OpenAI API Key</label>
+                        <input type="password" class="form-control" id="OPENAI_API_KEY" name="OPENAI_API_KEY" placeholder="Leave blank to keep current API key">
+                        <small class="form-text text-muted">Leave blank to keep the current API key.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="OPENAI_CONCURRENCY_LIMIT">OpenAI Concurrency Limit</label>
+                        <input type="number" class="form-control" id="OPENAI_CONCURRENCY_LIMIT" name="OPENAI_CONCURRENCY_LIMIT" value="{{ env_vars.OPENAI_CONCURRENCY_LIMIT }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="MAX_TOKENS">Max Tokens</label>
+                        <input type="number" class="form-control" id="MAX_TOKENS" name="MAX_TOKENS" value="{{ env_vars.MAX_TOKENS }}">
+                    </div>
+                    
+                    <h6 class="mb-3 mt-4">Logging Settings</h6>
+                    <div class="form-group">
+                        <label for="LOG_LEVEL">Log Level</label>
+                        <select class="form-control" id="LOG_LEVEL" name="LOG_LEVEL">
+                            <option value="DEBUG" {% if env_vars.LOG_LEVEL == 'DEBUG' %}selected{% endif %}>DEBUG</option>
+                            <option value="INFO" {% if env_vars.LOG_LEVEL == 'INFO' %}selected{% endif %}>INFO</option>
+                            <option value="WARNING" {% if env_vars.LOG_LEVEL == 'WARNING' %}selected{% endif %}>WARNING</option>
+                            <option value="ERROR" {% if env_vars.LOG_LEVEL == 'ERROR' %}selected{% endif %}>ERROR</option>
+                            <option value="CRITICAL" {% if env_vars.LOG_LEVEL == 'CRITICAL' %}selected{% endif %}>CRITICAL</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="LOG_FILE">Log File</label>
+                        <input type="text" class="form-control" id="LOG_FILE" name="LOG_FILE" value="{{ env_vars.LOG_FILE }}">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-trash-alt"></i> Clean Directories</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> Warning: Cleaning directories will permanently delete files. This action cannot be undone.
+                </div>
+                
+                <div class="list-group">
+                    <a href="{{ url_for('settings.clean_directory', directory='downloads') }}" class="list-group-item list-group-item-action" onclick="return confirm('Are you sure you want to clean the downloads directory?');">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1"><i class="fas fa-download"></i> Clean Downloads Directory</h6>
+                        </div>
+                        <small>Delete all files in the downloads directory.</small>
+                    </a>
+                    <a href="{{ url_for('settings.clean_directory', directory='metadata') }}" class="list-group-item list-group-item-action" onclick="return confirm('Are you sure you want to clean the metadata directory?');">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1"><i class="fas fa-file-alt"></i> Clean Metadata Directory</h6>
+                        </div>
+                        <small>Delete all files in the metadata directory.</small>
+                    </a>
+                    <a href="{{ url_for('settings.clean_directory', directory='analysis') }}" class="list-group-item list-group-item-action" onclick="return confirm('Are you sure you want to clean the analysis directory?');">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1"><i class="fas fa-brain"></i> Clean Analysis Directory</h6>
+                        </div>
+                        <small>Delete all files in the analysis directory.</small>
+                    </a>
+                    <a href="{{ url_for('settings.clean_directory', directory='upload') }}" class="list-group-item list-group-item-action" onclick="return confirm('Are you sure you want to clean the upload directory?');">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1"><i class="fas fa-upload"></i> Clean Upload Directory</h6>
+                        </div>
+                        <small>Delete all files in the upload directory.</small>
+                    </a>
+                    <a href="{{ url_for('settings.clean_directory', directory='upload_metadata') }}" class="list-group-item list-group-item-action" onclick="return confirm('Are you sure you want to clean the upload metadata directory?');">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1"><i class="fas fa-tags"></i> Clean Upload Metadata Directory</h6>
+                        </div>
+                        <small>Delete all files in the upload metadata directory.</small>
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle"></i> System Information</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tbody>
+                        <tr>
+                            <th>Version</th>
+                            <td>1.0.0</td>
+                        </tr>
+                        <tr>
+                            <th>Data Directory</th>
+                            <td>{{ config.data_dir }}</td>
+                        </tr>
+                        <tr>
+                            <th>Logs Directory</th>
+                            <td>{{ config.logs_dir }}</td>
+                        </tr>
+                        <tr>
+                            <th>Config Directory</th>
+                            <td>{{ config.config_dir }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                {% if schema %}
+                <h6 class="mt-4">SharePoint Schema</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Field</th>
+                                <th>Type</th>
+                                <th>Required</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for field in schema.fields %}
+                            <tr>
+                                <td>{{ field.title }}</td>
+                                <td>{{ field.type }}</td>
+                                <td>{% if field.required %}Yes{% else %}No{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info mt-4">
+                    <i class="fas fa-info-circle"></i> SharePoint schema not loaded. Run "Load Metadata Schema" from the dashboard.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
