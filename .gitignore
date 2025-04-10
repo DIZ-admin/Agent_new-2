@@ -1,0 +1,42 @@
+# Данные и логи
+data/
+logs/
+
+# Конфиденциальные настройки (раскомментируйте, если не хотите добавлять в репозиторий)
+# config/config.env
+
+# Python кэши
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Виртуальные окружения
+venv/
+ENV/
+.env
+
+# Файлы IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Файлы Docker 
+.dockerignore

@@ -1,0 +1,93 @@
+stages:
+  - test
+  - build
+  - deploy
+
+variables:
+  DOCKER_IMAGE: photo-agent:${CI_COMMIT_REF_NAME}
+
+# Выполнение интеграционных тестов
+test_integration:
+  stage: test
+  image: python:3.9
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - apt-get update && apt-get install -y docker.io
+    - pip install -r requirements.txt
+    - pip install pytest pytest-mock
+  script:
+    - bash tests/run_tests.sh
+  artifacts:
+    paths:
+      - docker_test/logs/
+    when: on_failure
+    expire_in: 1 week
+
+# Сборка Docker-образа
+build_docker:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - docker build -t $DOCKER_IMAGE .
+    - docker save $DOCKER_IMAGE | gzip > image.tar.gz
+  artifacts:
+    paths:
+      - image.tar.gz
+    expire_in: 1 week
+  only:
+    - main
+    - staging
+
+# Развертывание в тестовой среде
+deploy_staging:
+  stage: deploy
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - docker load < image.tar.gz
+  script:
+    - docker-compose -f docker-compose.yml up -d
+  environment:
+    name: staging
+  dependencies:
+    - build_docker
+  only:
+    - staging
+
+# Развертывание в production
+deploy_production:
+  stage: deploy
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - docker load < image.tar.gz
+  script:
+    - docker-compose -f docker-compose.yml up -d
+  environment:
+    name: production
+  dependencies:
+    - build_docker
+  when: manual
+  only:
+    - main

@@ -1,0 +1,508 @@
+{
+  "library_title": "Fertige Referenzfotos",
+  "fields": [
+    {
+      "internal_name": "Title",
+      "title": "Titel",
+      "type": "Text",
+      "required": false,
+      "description": ""
+    },
+    {
+      "internal_name": "Kunde",
+      "title": "Kunde",
+      "type": "Text",
+      "required": false,
+      "description": ""
+    },
+    {
+      "internal_name": "OrtohnePLZ",
+      "title": "Ort",
+      "type": "Text",
+      "required": false,
+      "description": ""
+    },
+    {
+      "internal_name": "Projektkategorie",
+      "title": "Projektkategorie",
+      "type": "Choice",
+      "required": false,
+      "description": "",
+      "choices": [
+        "Landwirtschaft",
+        "Wohnbaute",
+        "Industrie / Gewerbe",
+        "Umbau / Sanierung",
+        "Aufstockung / Erweiterung"
+      ]
+    },
+    {
+      "internal_name": "Material",
+      "title": "Material",
+      "type": "MultiChoice",
+      "required": false,
+      "description": "Здесь должны быть указаны материалы из списка, обнаруженные на фото ",
+      "choices": [
+        "Holz",
+        "Metall",
+        "Blech",
+        "Putz",
+        "Faserzement",
+        "Kupfer",
+        "Alu",
+        "Glas",
+        "3-Schicht",
+        "Sandwich",
+        "Ziegel",
+        "Eternit",
+        "Kunststoff",
+        "Altholz",
+        "BSH",
+        "Kerto",
+        "Prefa",
+        "Bitumen",
+        "Teppich"
+      ]
+    },
+    {
+      "internal_name": "Holzart",
+      "title": "Holzart",
+      "type": "MultiChoice",
+      "required": false,
+      "description": "",
+      "choices": [
+        "Eiche",
+        "Esche",
+        "Fichte",
+        "Weisstanne",
+        "Tanne",
+        "Buche",
+        "Lärche",
+        "Div Massivhölzer"
+      ]
+    },
+    {
+      "internal_name": "Beschreibung",
+      "title": "Beschreibung",
+      "type": "Note",
+      "required": false,
+      "description": "Здесь должно быть 3-4 предложения, описывающих, что изображено на фото"
+    },
+    {
+      "internal_name": "Treppe",
+      "title": "Treppe",
+      "type": "Choice",
+      "required": false,
+      "description": "",
+      "choices": [
+        "Eingestemmt",
+        "Aufgesattelt",
+        "Treppengeländer",
+        "Faltwerk",
+        "Landwirtschaftstreppe"
+      ]
+    },
+    {
+      "internal_name": "Ansicht",
+      "title": "Ansicht",
+      "type": "Choice",
+      "required": false,
+      "description": "",
+      "choices": [
+        "Innenaufnahme",
+        "Aussenaufnahme"
+      ]
+    },
+    {
+      "internal_name": "Sparte_x002f_Kategorie",
+      "title": "Sparte / Kategorie",
+      "type": "MultiChoice",
+      "required": false,
+      "description": "",
+      "choices": [
+        "Spengler Steildach",
+        "Spengler Flachdach",
+        "Ausbauarbeit",
+        "Dacheindeckung",
+        "Holzbau",
+        "Andere Gewerke",
+        "Agrar"
+      ]
+    },
+    {
+      "internal_name": "B_x00f6_denDecken",
+      "title": "Böden & Decken",
+      "type": "MultiChoice",
+      "required": false,
+      "description": "",
+      "choices": [
+        "Flächige 3SP",
+        "Massivholzboden",
+        "Konventionell",
+        "Andere (Handelsprodukte)"
+      ]
+    },
+    {
+      "internal_name": "Fassade",
+      "title": "Fassade",
+      "type": "MultiChoice",
+      "required": false,
+      "description": "",
+      "choices": [
+        "Holzfassade horizontal",
+        "Holzfassade vertikal",
+        "Falzbahn",
+        "Verputzt",
+        "Grossformatplatten",
+        "Schieferfassaden",
+        "Sandwich"
+      ]
+    },
+    {
+      "internal_name": "Bauteil",
+      "title": "Bauteil",
+      "type": "MultiChoice",
+      "required": false,
+      "description": "",
+      "choices": [
+        "Decke",
+        "Möbel",
+        "Fenster",
+        "Dachfenster",
+        "Fensterabschlüsse (Bank, Leibung, Sims)",
+        "Bodenbelag",
+        "Türen",
+        "Treppe",
+        "Fassade",
+        "Schneefang",
+        "Photovoltaikanlage Inndach",
+        "Photovoltaikanlage Aufdach"
+      ]
+    },
+    {
+      "internal_name": "Ausf_x00fc_hrung",
+      "title": "Ausführung",
+      "type": "MultiChoice",
+      "required": false,
+      "description": "",
+      "choices": [
+        "Akustik",
+        "Blockfutter",
+        "Blendrahmen",
+        "Futtertüre",
+        "HST",
+        "Gardarobe",
+        "Schrank",
+        "Sitzfenster"
+      ]
+    },
+    {
+      "internal_name": "Farbbehandlung",
+      "title": "Farbbehandlung",
+      "type": "MultiChoice",
+      "required": false,
+      "description": "",
+      "choices": [
+        "Lasur (Aussen)",
+        "deckend",
+        "geölt",
+        "druckimprägniert",
+        "unbehandelt",
+        "weiss lasiert (Innen)",
+        "farblos lasiert (Innen)"
+      ]
+    },
+    {
+      "internal_name": "Gel_x00e4_nder",
+      "title": "Geländer",
+      "type": "Choice",
+      "required": false,
+      "description": "",
+      "choices": [
+        "Holzgeländer",
+        "Glasgeländer",
+        "Staketengeländer",
+        "Plattengeländer"
+      ]
+    },
+    {
+      "internal_name": "Raum",
+      "title": "Raum",
+      "type": "Choice",
+      "required": false,
+      "description": "В этом поле определяется комната",
+      "choices": [
+        "Küche",
+        "WC / Bad",
+        "Zimmer",
+        "Essen / Wohnen",
+        "Treppenhaus"
+      ]
+    },
+    {
+      "internal_name": "Marketing",
+      "title": "Marketing",
+      "type": "Choice",
+      "required": false,
+      "description": "",
+      "choices": [
+        "Montage",
+        "Mitarbeiter am Arbeiten",
+        "Betrieb",
+        "Infrastruktur & Logistik",
+        "Referenzbild"
+      ]
+    },
+    {
+      "internal_name": "G_x00fc_llelager",
+      "title": "Güllelager",
+      "type": "MultiChoice",
+      "required": false,
+      "description": "",
+      "choices": [
+        "Tragblech",
+        "Sandwich",
+        "Spezialprojekte",
+        "Email"
+      ]
+    },
+    {
+      "internal_name": "Status",
+      "title": "Status",
+      "type": "Choice",
+      "required": true,
+      "description": "",
+      "choices": [
+        "Entwurf KI",
+        "Bearbeitet Marketing",
+        "Bearbeitet Verkauf",
+        "Fertig"
+      ]
+    },
+    {
+      "internal_name": "KItags",
+      "title": "KI tags",
+      "type": "Note",
+      "required": false,
+      "description": "Здесь должны быть теги, которые созданы ИИ, но отсутствуют в основной схеме"
+    },
+    {
+      "internal_name": "MediaServiceOCR",
+      "title": "Extracted Text",
+      "type": "Note",
+      "required": false,
+      "description": ""
+    },
+    {
+      "internal_name": "OriginalName",
+      "title": "OriginalName",
+      "type": "Text",
+      "required": false,
+      "description": ""
+    }
+  ],
+  "choice_fields": {
+    "Projektkategorie": {
+      "title": "Projektkategorie",
+      "type": "Choice",
+      "choices": [
+        "Landwirtschaft",
+        "Wohnbaute",
+        "Industrie / Gewerbe",
+        "Umbau / Sanierung",
+        "Aufstockung / Erweiterung"
+      ]
+    },
+    "Material": {
+      "title": "Material",
+      "type": "MultiChoice",
+      "choices": [
+        "Holz",
+        "Metall",
+        "Blech",
+        "Putz",
+        "Faserzement",
+        "Kupfer",
+        "Alu",
+        "Glas",
+        "3-Schicht",
+        "Sandwich",
+        "Ziegel",
+        "Eternit",
+        "Kunststoff",
+        "Altholz",
+        "BSH",
+        "Kerto",
+        "Prefa",
+        "Bitumen",
+        "Teppich"
+      ]
+    },
+    "Holzart": {
+      "title": "Holzart",
+      "type": "MultiChoice",
+      "choices": [
+        "Eiche",
+        "Esche",
+        "Fichte",
+        "Weisstanne",
+        "Tanne",
+        "Buche",
+        "Lärche",
+        "Div Massivhölzer"
+      ]
+    },
+    "Treppe": {
+      "title": "Treppe",
+      "type": "Choice",
+      "choices": [
+        "Eingestemmt",
+        "Aufgesattelt",
+        "Treppengeländer",
+        "Faltwerk",
+        "Landwirtschaftstreppe"
+      ]
+    },
+    "Ansicht": {
+      "title": "Ansicht",
+      "type": "Choice",
+      "choices": [
+        "Innenaufnahme",
+        "Aussenaufnahme"
+      ]
+    },
+    "Sparte_x002f_Kategorie": {
+      "title": "Sparte / Kategorie",
+      "type": "MultiChoice",
+      "choices": [
+        "Spengler Steildach",
+        "Spengler Flachdach",
+        "Ausbauarbeit",
+        "Dacheindeckung",
+        "Holzbau",
+        "Andere Gewerke",
+        "Agrar"
+      ]
+    },
+    "B_x00f6_denDecken": {
+      "title": "Böden & Decken",
+      "type": "MultiChoice",
+      "choices": [
+        "Flächige 3SP",
+        "Massivholzboden",
+        "Konventionell",
+        "Andere (Handelsprodukte)"
+      ]
+    },
+    "Fassade": {
+      "title": "Fassade",
+      "type": "MultiChoice",
+      "choices": [
+        "Holzfassade horizontal",
+        "Holzfassade vertikal",
+        "Falzbahn",
+        "Verputzt",
+        "Grossformatplatten",
+        "Schieferfassaden",
+        "Sandwich"
+      ]
+    },
+    "Bauteil": {
+      "title": "Bauteil",
+      "type": "MultiChoice",
+      "choices": [
+        "Decke",
+        "Möbel",
+        "Fenster",
+        "Dachfenster",
+        "Fensterabschlüsse (Bank, Leibung, Sims)",
+        "Bodenbelag",
+        "Türen",
+        "Treppe",
+        "Fassade",
+        "Schneefang",
+        "Photovoltaikanlage Inndach",
+        "Photovoltaikanlage Aufdach"
+      ]
+    },
+    "Ausf_x00fc_hrung": {
+      "title": "Ausführung",
+      "type": "MultiChoice",
+      "choices": [
+        "Akustik",
+        "Blockfutter",
+        "Blendrahmen",
+        "Futtertüre",
+        "HST",
+        "Gardarobe",
+        "Schrank",
+        "Sitzfenster"
+      ]
+    },
+    "Farbbehandlung": {
+      "title": "Farbbehandlung",
+      "type": "MultiChoice",
+      "choices": [
+        "Lasur (Aussen)",
+        "deckend",
+        "geölt",
+        "druckimprägniert",
+        "unbehandelt",
+        "weiss lasiert (Innen)",
+        "farblos lasiert (Innen)"
+      ]
+    },
+    "Gel_x00e4_nder": {
+      "title": "Geländer",
+      "type": "Choice",
+      "choices": [
+        "Holzgeländer",
+        "Glasgeländer",
+        "Staketengeländer",
+        "Plattengeländer"
+      ]
+    },
+    "Raum": {
+      "title": "Raum",
+      "type": "Choice",
+      "choices": [
+        "Küche",
+        "WC / Bad",
+        "Zimmer",
+        "Essen / Wohnen",
+        "Treppenhaus"
+      ]
+    },
+    "Marketing": {
+      "title": "Marketing",
+      "type": "Choice",
+      "choices": [
+        "Montage",
+        "Mitarbeiter am Arbeiten",
+        "Betrieb",
+        "Infrastruktur & Logistik",
+        "Referenzbild"
+      ]
+    },
+    "G_x00fc_llelager": {
+      "title": "Güllelager",
+      "type": "MultiChoice",
+      "choices": [
+        "Tragblech",
+        "Sandwich",
+        "Spezialprojekte",
+        "Email"
+      ]
+    },
+    "Status": {
+      "title": "Status",
+      "type": "Choice",
+      "choices": [
+        "Entwurf KI",
+        "Bearbeitet Marketing",
+        "Bearbeitet Verkauf",
+        "Fertig"
+      ]
+    }
+  }
+}

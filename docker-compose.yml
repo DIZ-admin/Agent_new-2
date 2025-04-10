@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  agent:
+    build: .
+    container_name: photo-agent
+    volumes:
+      # Маунтируем для сохранения данных между запусками
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config:/app/config
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Berlin
+      - PYTHONUNBUFFERED=1
+    # По умолчанию запускаем авто-процесс
+    command: python -m src.auto_process
+    # Можно запустить отдельный модуль, раскомментировав нужную строку:
+    # command: python -m src.metadata_schema
+    # command: python -m src.photo_metadata
+    # command: python -m src.openai_analyzer
+    # command: python -m src.metadata_generator
+    # command: python -m src.sharepoint_uploader
