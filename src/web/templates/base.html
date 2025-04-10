@@ -94,29 +94,29 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav mr-auto">
-                <li class="nav-item {% if request.endpoint == 'main.index' %}active{% endif %}">
+                <li class="nav-item {% if request.endpoint and request.endpoint == 'main.index' %}active{% endif %}">
                     <a class="nav-link" href="{{ url_for('main.index') }}">
                         <i class="fas fa-tachometer-alt"></i> Dashboard
                     </a>
                 </li>
-                <li class="nav-item {% if request.endpoint.startswith('photos.') %}active{% endif %}">
+                <li class="nav-item {% if request.endpoint and request.endpoint.startswith('photos.') %}active{% endif %}">
                     <a class="nav-link" href="{{ url_for('photos.index') }}">
                         <i class="fas fa-images"></i> Photos
                     </a>
                 </li>
-                <li class="nav-item {% if request.endpoint.startswith('logs.') %}active{% endif %}">
+                <li class="nav-item {% if request.endpoint and request.endpoint.startswith('logs.') %}active{% endif %}">
                     <a class="nav-link" href="{{ url_for('logs.index') }}">
                         <i class="fas fa-clipboard-list"></i> Logs
                     </a>
                 </li>
-                <li class="nav-item {% if request.endpoint.startswith('settings.') %}active{% endif %}">
+                <li class="nav-item {% if request.endpoint and request.endpoint.startswith('settings.') %}active{% endif %}">
                     <a class="nav-link" href="{{ url_for('settings.index') }}">
                         <i class="fas fa-cogs"></i> Settings
                     </a>
                 </li>
             </ul>
             <div class="navbar-text">
-                <small>Version: 1.0.0</small>
+                <small>Version: 1.1.0</small>
             </div>
         </div>
     </div>
