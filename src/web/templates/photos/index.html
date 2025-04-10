@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+    .photo-thumbnail {
+        width: 100px;
+        height: 100px;
+        object-fit: cover;
+        border-radius: 4px;
+    }
+</style>
 <div class="row">
     <div class="col-md-12">
         <h1>Photos Management</h1>
@@ -32,32 +40,32 @@
     <div class="col-md-12">
         <ul class="nav nav-tabs" id="photoTabs" role="tablist">
             <li class="nav-item">
-                <a class="nav-link active" id="downloads-tab" data-toggle="tab" href="#downloads" role="tab" aria-controls="downloads" aria-selected="true">
+                <a class="nav-link {% if active_tab == 'downloads' %}active{% endif %}" id="downloads-tab" data-toggle="tab" href="#downloads" role="tab" aria-controls="downloads" aria-selected="{{ 'true' if active_tab == 'downloads' else 'false' }}">
                     <i class="fas fa-download"></i> Downloads ({{ downloads|length }})
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="analyzed-tab" data-toggle="tab" href="#analyzed" role="tab" aria-controls="analyzed" aria-selected="false">
+                <a class="nav-link {% if active_tab == 'analyzed' %}active{% endif %}" id="analyzed-tab" data-toggle="tab" href="#analyzed" role="tab" aria-controls="analyzed" aria-selected="{{ 'true' if active_tab == 'analyzed' else 'false' }}">
                     <i class="fas fa-brain"></i> Analyzed ({{ analyzed|length }})
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="upload-ready-tab" data-toggle="tab" href="#upload-ready" role="tab" aria-controls="upload-ready" aria-selected="false">
+                <a class="nav-link {% if active_tab == 'upload_ready' %}active{% endif %}" id="upload-ready-tab" data-toggle="tab" href="#upload-ready" role="tab" aria-controls="upload-ready" aria-selected="{{ 'true' if active_tab == 'upload_ready' else 'false' }}">
                     <i class="fas fa-upload"></i> Ready for Upload ({{ upload_ready|length }})
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="uploaded-tab" data-toggle="tab" href="#uploaded" role="tab" aria-controls="uploaded" aria-selected="false">
+                <a class="nav-link {% if active_tab == 'uploaded' %}active{% endif %}" id="uploaded-tab" data-toggle="tab" href="#uploaded" role="tab" aria-controls="uploaded" aria-selected="{{ 'true' if active_tab == 'uploaded' else 'false' }}">
                     <i class="fas fa-cloud-upload-alt"></i> Uploaded ({{ uploaded|length }})
                 </a>
             </li>
         </ul>
         <div class="tab-content" id="photoTabsContent">
             <!-- Downloads Tab -->
-            <div class="tab-pane fade show active" id="downloads" role="tabpanel" aria-labelledby="downloads-tab">
+            <div class="tab-pane fade {% if active_tab == 'downloads' %}show active{% endif %}" id="downloads" role="tabpanel" aria-labelledby="downloads-tab">
                 <div class="card">
                     <div class="card-body">
-                        {% if downloads %}
+                        {% if active_tab == 'downloads' and current_items %}
                         <div class="table-responsive">
                             <table class="table table-striped">
                                 <thead>
@@ -70,7 +78,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for photo in downloads %}
+                                    {% for photo in current_items %}
                                     <tr>
                                         <td>
                                             <a href="{{ url_for('photos.view_photo', filename=photo.name) }}" target="_blank">
@@ -90,7 +98,7 @@
                                 </tbody>
                             </table>
                         </div>
-                        {% else %}
+                        {% elif active_tab == 'downloads' %}
                         <p class="text-muted">No photos found in downloads directory.</p>
                         {% endif %}
                     </div>
@@ -98,10 +106,10 @@
             </div>
 
             <!-- Analyzed Tab -->
-            <div class="tab-pane fade" id="analyzed" role="tabpanel" aria-labelledby="analyzed-tab">
+            <div class="tab-pane fade {% if active_tab == 'analyzed' %}show active{% endif %}" id="analyzed" role="tabpanel" aria-labelledby="analyzed-tab">
                 <div class="card">
                     <div class="card-body">
-                        {% if analyzed %}
+                        {% if active_tab == 'analyzed' and current_items %}
                         <div class="table-responsive">
                             <table class="table table-striped">
                                 <thead>
@@ -114,7 +122,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for photo in analyzed %}
+                                    {% for photo in current_items %}
                                     <tr>
                                         <td>
                                             {% if photo.original_path %}
@@ -140,7 +148,7 @@
                                 </tbody>
                             </table>
                         </div>
-                        {% else %}
+                        {% elif active_tab == 'analyzed' %}
                         <p class="text-muted">No analyzed photos found.</p>
                         {% endif %}
                     </div>
@@ -148,10 +156,10 @@
             </div>
 
             <!-- Ready for Upload Tab -->
-            <div class="tab-pane fade" id="upload-ready" role="tabpanel" aria-labelledby="upload-ready-tab">
+            <div class="tab-pane fade {% if active_tab == 'upload_ready' %}show active{% endif %}" id="upload-ready" role="tabpanel" aria-labelledby="upload-ready-tab">
                 <div class="card">
                     <div class="card-body">
-                        {% if upload_ready %}
+                        {% if active_tab == 'upload_ready' and current_items %}
                         <div class="table-responsive">
                             <table class="table table-striped">
                                 <thead>
@@ -164,7 +172,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for photo in upload_ready %}
+                                    {% for photo in current_items %}
                                     <tr>
                                         <td>
                                             <a href="{{ url_for('photos.view_photo', filename=photo.name) }}" target="_blank">
@@ -184,7 +192,7 @@
                                 </tbody>
                             </table>
                         </div>
-                        {% else %}
+                        {% elif active_tab == 'upload_ready' %}
                         <p class="text-muted">No photos ready for upload found.</p>
                         {% endif %}
                     </div>
@@ -192,10 +200,10 @@
             </div>
 
             <!-- Uploaded Tab -->
-            <div class="tab-pane fade" id="uploaded" role="tabpanel" aria-labelledby="uploaded-tab">
+            <div class="tab-pane fade {% if active_tab == 'uploaded' %}show active{% endif %}" id="uploaded" role="tabpanel" aria-labelledby="uploaded-tab">
                 <div class="card">
                     <div class="card-body">
-                        {% if uploaded %}
+                        {% if active_tab == 'uploaded' and current_items %}
                         <div class="table-responsive">
                             <table class="table table-striped">
                                 <thead>
@@ -208,7 +216,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for photo in uploaded %}
+                                    {% for photo in current_items %}
                                     <tr>
                                         <td>
                                             <a href="{{ url_for('photos.view_photo', filename=photo.name) }}" target="_blank">
@@ -228,12 +236,37 @@
                                 </tbody>
                             </table>
                         </div>
-                        {% else %}
+                        {% elif active_tab == 'uploaded' %}
                         <p class="text-muted">No uploaded photos found.</p>
                         {% endif %}
                     </div>
                 </div>
             </div>
+
+            <!-- Pagination -->
+            {% if pagination and pagination.total_pages > 1 %}
+            <nav aria-label="Photo pagination" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('photos.index', tab=active_tab, page=pagination.prev_page) if pagination.has_prev else '#' }}" aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+
+                    {% for p in pagination.pages %}
+                    <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('photos.index', tab=active_tab, page=p) }}">{{ p }}</a>
+                    </li>
+                    {% endfor %}
+
+                    <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('photos.index', tab=active_tab, page=pagination.next_page) if pagination.has_next else '#' }}" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            {% endif %}
         </div>
     </div>
 </div>
