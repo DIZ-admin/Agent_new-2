@@ -176,7 +176,7 @@
                                     <tr>
                                         <td>
                                             <a href="{{ url_for('photos.view_photo', filename=photo.name) }}" target="_blank">
-                                                <img src="{{ url_for('photos.view_photo', filename=photo.name) }}" class="photo-thumbnail" alt="{{ photo.name }}">
+                                                <img src="{{ url_for('photos.view_photo', filename=photo.name) }}" class="photo-thumbnail" alt="{{ photo.name }}" onerror="this.onerror=null; this.src='/static/img/no-image.png'; this.alt='Image not available';">
                                             </a>
                                         </td>
                                         <td>{{ photo.name }}</td>
@@ -220,7 +220,7 @@
                                     <tr>
                                         <td>
                                             <a href="{{ url_for('photos.view_photo', filename=photo.name) }}" target="_blank">
-                                                <img src="{{ url_for('photos.view_photo', filename=photo.name) }}" class="photo-thumbnail" alt="{{ photo.name }}">
+                                                <img src="{{ url_for('photos.view_photo', filename=photo.name) }}" class="photo-thumbnail" alt="{{ photo.name }}" onerror="this.onerror=null; this.src='/static/img/no-image.png'; this.alt='Image not available';">
                                             </a>
                                         </td>
                                         <td>{{ photo.name }}</td>
