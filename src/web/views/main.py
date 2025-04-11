@@ -103,6 +103,13 @@ def monitor_process(process, pid, script_name):
 
         # Process has completed, get any remaining output
         try:
+            # Reset file descriptors to blocking mode before communicate
+            # This prevents potential resource leaks
+            fl_stdout = fcntl.fcntl(stdout_fd, fcntl.F_GETFL)
+            fcntl.fcntl(stdout_fd, fcntl.F_SETFL, fl_stdout & ~os.O_NONBLOCK)
+            fl_stderr = fcntl.fcntl(stderr_fd, fcntl.F_GETFL)
+            fcntl.fcntl(stderr_fd, fcntl.F_SETFL, fl_stderr & ~os.O_NONBLOCK)
+
             remaining_stdout, remaining_stderr = process.communicate(timeout=1)
             if remaining_stdout:
                 stdout_data += remaining_stdout

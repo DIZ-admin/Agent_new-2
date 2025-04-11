@@ -1,235 +1,235 @@
-# Подробное описание рабочего процесса (workflow) проекта
+# Detaillierte Beschreibung des Arbeitsablaufs (Workflow) des Projekts
 
-## Общий обзор
+## Allgemeine Übersicht
 
-Данный проект представляет собой автоматизированную систему для обработки фотографий строительных проектов компании ERNI, специализирующейся на деревянных конструкциях. Система выполняет полный цикл обработки: от загрузки фотографий из SharePoint, их анализа с помощью искусственного интеллекта, до генерации метаданных и загрузки обратно в SharePoint с обогащенной информацией.
+Dieses Projekt stellt ein automatisiertes System zur Verarbeitung von Fotografien von Bauprojekten der Firma ERNI dar, die sich auf Holzstrukturen spezialisiert hat. Das System führt den vollständigen Verarbeitungszyklus durch: von der Hochladung von Fotografien aus SharePoint, ihrer Analyse mithilfe von künstlicher Intelligenz, bis hin zur Generierung von Metadaten und dem Hochladen zurück in SharePoint mit angereicherten Informationen.
 
-## Детальный рабочий процесс
+## Detaillierter Arbeitsablauf
 
-### 1. Инициализация и настройка
+### 1. Initialisierung und Konfiguration
 
-**Компоненты:**
-- Docker-контейнер с Python-окружением
-- Конфигурационные файлы (config.env, sharepoint_choices.json)
-- Директории для хранения данных
+**Komponenten:**
+- Docker-Container mit Python-Umgebung
+- Konfigurationsdateien (config.env, sharepoint_choices.json)
+- Verzeichnisse zur Datenspeicherung
 
-**Процесс:**
-1. Система загружается и инициализирует необходимые директории:
-   - `/app/data/downloads` - для загрузки файлов из SharePoint
-   - `/app/data/metadata` - для хранения EXIF-метаданных
-   - `/app/data/analysis` - для результатов анализа OpenAI
-   - `/app/data/upload` - для подготовки файлов к загрузке
-   - `/app/data/uploaded` - для успешно загруженных файлов
-   - `/app/data/processed` - для обработанных файлов
-   - `/app/data/registry` - для реестра файлов
+**Prozess:**
+1. Das System wird geladen und initialisiert die erforderlichen Verzeichnisse:
+   - `/app/data/downloads` - für den Download von Dateien aus SharePoint
+   - `/app/data/metadata` - zur Speicherung von EXIF-Metadaten
+   - `/app/data/analysis` - für die Analyseergebnisse von OpenAI
+   - `/app/data/upload` - zur Vorbereitung von Dateien für den Upload
+   - `/app/data/uploaded` - für erfolgreich hochgeladene Dateien
+   - `/app/data/processed` - für verarbeitete Dateien
+   - `/app/data/registry` - für das Register der Dateien
 
-2. Система загружает конфигурацию:
-   - Учетные данные SharePoint
-   - Настройки OpenAI API
-   - Промпты для анализа фотографий
-   - Схему метаданных SharePoint
+2. Das System lädt die Konfiguration:
+   - SharePoint-Anmeldeinformationen
+   - Einstellungen für die OpenAI API
+   - Prompts zur Analyse von Fotografien
+   - Schema der SharePoint-Metadaten
 
-### 2. Загрузка схемы метаданных из SharePoint
+### 2. Hochladen des Metadatenschemas aus SharePoint
 
-**Модуль:** `metadata_schema.py`
+**Modul:** `metadata_schema.py`
 
-**Процесс:**
-1. Система подключается к SharePoint с использованием учетных данных
-2. Извлекает схему метаданных из библиотеки "Referenzfotos"
-3. Преобразует схему в удобный для использования формат
-4. Сохраняет схему в файл `sharepoint_choices.json`
+**Prozess:**
+1. Das System verbindet sich mit SharePoint unter Verwendung der Anmeldeinformationen
+2. Extrahiert das Metadatenschema aus der Bibliothek "Referenzfotos"
+3. Wandelt das Schema in ein benutzerfreundliches Format um
+4. Speichert das Schema in der Datei `sharepoint_choices.json`
 
-**Результат:**
-- Файл с полной схемой метаданных, включая:
-  - Названия полей
-  - Типы полей (текст, выбор, множественный выбор)
-  - Допустимые значения для полей с выбором
-  - Обязательные поля
+**Ergebnis:**
+- Datei mit dem vollständigen Metadatenschema, einschließlich:
+  - Feldnamen
+  - Feldtypen (Text, Auswahl, Mehrfachauswahl)
+  - Zulässige Werte für Auswahlfelder
+  - Pflichtfelder
 
-### 3. Загрузка фотографий из SharePoint
+### 3. Hochladen von Fotografien aus SharePoint
 
-**Модуль:** `photo_metadata.py`
+**Modul:** `photo_metadata.py`
 
-**Процесс:**
-1. Система подключается к SharePoint
-2. Получает список фотографий из библиотеки "Referenzfotos"
-3. Загружает фотографии пакетами по 10 штук
-4. Для каждой фотографии:
-   - Проверяет размер файла (пропускает файлы > 15 МБ)
-   - Загружает файл в директорию `/app/data/downloads`
-   - Извлекает EXIF-метаданные с помощью библиотеки PIL
-   - Форматирует EXIF-данные в читаемый вид, включая GPS-координаты
-   - Сохраняет метаданные в YAML-файл в директории `/app/data/metadata`
-   - Добавляет запись в реестр загруженных файлов
-   - Перемещает файл в директорию `/app/data/processed` на стороне SharePoint
+**Prozess:**
+1. Das System verbindet sich mit SharePoint
+2. Holen Sie sich eine Liste von Fotografien aus der Bibliothek "Referenzfotos"
+3. Lädt Fotografien in Paketen von 10 Stück hoch
+4. Für jede Fotografie:
+   - Überprüft die Dateigröße (überspringt Dateien > 15 MB)
+   - Lädt die Datei in das Verzeichnis `/app/data/downloads`
+   - Extrahiert EXIF-Metadaten mithilfe der PIL-Bibliothek
+   - Formatiert die EXIF-Daten in ein lesbares Format, einschließlich GPS-Koordinaten
+   - Speichert die Metadaten in einer YAML-Datei im Verzeichnis `/app/data/metadata`
+   - Fügt einen Eintrag in das Register der hochgeladenen Dateien hinzu
+   - Verschiebt die Datei in das Verzeichnis `/app/data/processed` auf der SharePoint-Seite
 
-**Результат:**
-- Загруженные фотографии в директории `/app/data/downloads`
-- YAML-файлы с EXIF-метаданными в директории `/app/data/metadata`
-- Обновленный реестр загруженных файлов
+**Ergebnis:**
+- Hochgeladene Fotografien im Verzeichnis `/app/data/downloads`
+- YAML-Dateien mit EXIF-Metadaten im Verzeichnis `/app/data/metadata`
+- Aktualisiertes Register der hochgeladenen Dateien
 
-### 4. Анализ фотографий с помощью OpenAI
+### 4. Analyse von Fotografien mit OpenAI
 
-**Модуль:** `openai_analyzer.py`
+**Modul:** `openai_analyzer.py`
 
-**Процесс:**
-1. Система находит фотографии в директории `/app/data/downloads`
-2. Загружает схему метаданных из файла `sharepoint_choices.json`
-3. Для каждой фотографии:
-   - Проверяет, была ли она уже проанализирована (по хешу файла)
-   - Извлекает и форматирует EXIF-метаданные
-   - Подготавливает промпт для OpenAI, включая EXIF-данные
-   - Оптимизирует изображение (уменьшает до максимального размера 1024 пикселя)
-   - Кодирует изображение в base64
-   - Отправляет запрос к OpenAI API (модель GPT-4o)
-   - Получает и парсит JSON-ответ
-   - Сохраняет результаты анализа в JSON-файл в директории `/app/data/analysis`
-   - Добавляет запись в реестр проанализированных файлов
+**Prozess:**
+1. Das System findet Fotografien im Verzeichnis `/app/data/downloads`
+2. Lädt das Metadatenschema aus der Datei `sharepoint_choices.json`
+3. Für jede Fotografie:
+   - Überprüft, ob sie bereits analysiert wurde (nach Dateihash)
+   - Extrahiert und formatiert die EXIF-Metadaten
+   - Bereitet den Prompt für OpenAI vor, einschließlich der EXIF-Daten
+   - Optimiert das Bild (reduziert auf eine maximale Größe von 1024 Pixel)
+   - Kodiert das Bild in base64
+   - Sendet eine Anfrage an die OpenAI API (Modell GPT-4o)
+   - Erhält und analysiert die JSON-Antwort
+   - Speichert die Analyseergebnisse in einer JSON-Datei im Verzeichnis `/app/data/analysis`
+   - Fügt einen Eintrag in das Register der analysierten Dateien hinzu
 
-**Особенности:**
-- Параллельная обработка с использованием ThreadPoolExecutor
-- Ограничение количества одновременных запросов (OPENAI_CONCURRENCY_LIMIT = 10)
-- Механизм повторных попыток при ошибках
-- Кэширование результатов анализа
+**Besonderheiten:**
+- Parallelverarbeitung mit ThreadPoolExecutor
+- Begrenzung der gleichzeitigen Anfragen (OPENAI_CONCURRENCY_LIMIT = 10)
+- Mechanismus für Wiederholungsversuche bei Fehlern
+- Caching der Analyseergebnisse
 
-**Результат:**
-- JSON-файлы с результатами анализа в директории `/app/data/analysis`
-- Обновленный реестр проанализированных файлов
+**Ergebnis:**
+- JSON-Dateien mit Analyseergebnissen im Verzeichnis `/app/data/analysis`
+- Aktualisiertes Register der analysierten Dateien
 
-### 5. Генерация метаданных для загрузки в SharePoint
+### 5. Generierung von Metadaten für den Upload in SharePoint
 
-**Модуль:** `metadata_generator.py`
+**Modul:** `metadata_generator.py`
 
-**Процесс:**
-1. Система находит фотографии, которые были проанализированы, но еще не загружены
-2. Загружает схему метаданных из файла `sharepoint_choices.json`
-3. Для каждой фотографии:
-   - Генерирует новое имя файла по маске `Erni_Referenzfoto_{number}`
-   - Загружает результаты анализа OpenAI и EXIF-метаданные
-   - Интеллектуально объединяет данные из обоих источников с учетом приоритетов
-   - Для GPS-координат пытается выполнить геокодирование для определения местоположения
-   - Валидирует значения полей в соответствии со схемой SharePoint
-   - Преобразует поля с множественным выбором в формат, понятный SharePoint
-   - Сохраняет метаданные в JSON-файл в директории `/app/data/upload/metadata`
-   - Копирует YAML-файл с EXIF-метаданными в ту же директорию
-   - Копирует фотографию в директорию `/app/data/upload` с новым именем
+**Prozess:**
+1. Das System findet Fotografien, die analysiert wurden, aber noch nicht hochgeladen sind
+2. Lädt das Metadatenschema aus der Datei `sharepoint_choices.json`
+3. Für jede Fotografie:
+   - Generiert einen neuen Dateinamen nach dem Muster `Erni_Referenzfoto_{number}`
+   - Lädt die Analyseergebnisse von OpenAI und die EXIF-Metadaten hoch
+   - Verknüpft die Daten aus beiden Quellen unter Berücksichtigung der Prioritäten intelligent
+   - Versucht, GPS-Koordinaten zu geokodieren, um den Standort zu bestimmen
+   - Validiert die Werte der Felder gemäß dem SharePoint-Schema
+   - Wandelt Felder mit Mehrfachauswahl in ein für SharePoint verständliches Format um
+   - Speichert die Metadaten in einer JSON-Datei im Verzeichnis `/app/data/upload/metadata`
+   - Kopiert die YAML-Datei mit den EXIF-Metadaten in dasselbe Verzeichnis
+   - Kopiert das Foto in das Verzeichnis `/app/data/upload` mit neuem Namen
 
-**Особенности:**
-- Интеллектуальное объединение данных из разных источников
-- Приоритеты источников для разных полей (например, дата из EXIF, описание из OpenAI)
-- Геокодирование GPS-координат с использованием API Nominatim
-- Валидация метаданных в соответствии со схемой SharePoint
+**Besonderheiten:**
+- Intelligente Verknüpfung von Daten aus verschiedenen Quellen
+- Prioritäten der Quellen für verschiedene Felder (z. B. Datum aus EXIF, Beschreibung aus OpenAI)
+- Geokodierung von GPS-Koordinaten mit der Nominatim API
+- Validierung der Metadaten gemäß dem SharePoint-Schema
 
-**Результат:**
-- Фотографии с новыми именами в директории `/app/data/upload`
-- JSON-файлы с метаданными в директории `/app/data/upload/metadata`
-- YAML-файлы с EXIF-метаданными в директории `/app/data/upload/metadata`
+**Ergebnis:**
+- Fotografien mit neuen Namen im Verzeichnis `/app/data/upload`
+- JSON-Dateien mit Metadaten im Verzeichnis `/app/data/upload/metadata`
+- YAML-Dateien mit EXIF-Metadaten im Verzeichnis `/app/data/upload/metadata`
 
-### 6. Загрузка фотографий в SharePoint
+### 6. Hochladen von Fotografien in SharePoint
 
-**Модуль:** `sharepoint_uploader.py`
+**Modul:** `sharepoint_uploader.py`
 
-**Процесс:**
-1. Система находит фотографии в директории `/app/data/upload`
-2. Подключается к SharePoint
-3. Для каждой фотографии:
-   - Загружает файл в библиотеку "Referenzfotos"
-   - Загружает соответствующий JSON-файл с метаданными
-   - Обновляет метаданные файла в SharePoint
-   - Загружает YAML-файл с EXIF-метаданными
-   - Добавляет запись в реестр загруженных файлов
-   - Перемещает файлы из директории `/app/data/upload` в `/app/data/uploaded`
+**Prozess:**
+1. Das System findet Fotografien im Verzeichnis `/app/data/upload`
+2. Verbindet sich mit SharePoint
+3. Für jede Fotografie:
+   - Lädt die Datei in die Bibliothek "Referenzfotos" hoch
+   - Lädt die entsprechende JSON-Datei mit Metadaten hoch
+   - Aktualisiert die Metadaten der Datei in SharePoint
+   - Lädt die YAML-Datei mit EXIF-Metadaten hoch
+   - Fügt einen Eintrag in das Register der hochgeladenen Dateien hinzu
+   - Verschiebt die Dateien aus dem Verzeichnis `/app/data/upload` in `/app/data/uploaded`
 
-**Особенности:**
-- Пакетная загрузка файлов (по 10 штук)
-- Механизм повторных попыток при ошибках
-- Обновление реестра загруженных файлов
+**Besonderheiten:**
+- Batch-Hochladen von Dateien (in Gruppen von 10)
+- Mechanismus für Wiederholungsversuche bei Fehlern
+- Aktualisierung des Registers der hochgeladenen Dateien
 
-**Результат:**
-- Фотографии, загруженные в SharePoint с обогащенными метаданными
-- Файлы, перемещенные в директорию `/app/data/uploaded`
-- Обновленный реестр загруженных файлов
+**Ergebnis:**
+- Fotografien, die mit angereicherten Metadaten in SharePoint hochgeladen wurden
+- Dateien, die in das Verzeichnis `/app/data/uploaded` verschoben wurden
+- Aktualisiertes Register der hochgeladenen Dateien
 
-### 7. Автоматический процесс
+### 7. Automatisierter Prozess
 
-**Модуль:** `auto_process.py`
+**Modul:** `auto_process.py`
 
-**Процесс:**
-1. Система последовательно запускает все модули:
-   - `metadata_schema.py` - загрузка схемы метаданных
-   - `photo_metadata.py` - загрузка фотографий и извлечение EXIF
-   - `openai_analyzer.py` - анализ фотографий с OpenAI
-   - `metadata_generator.py` - генерация метаданных
-   - `sharepoint_uploader.py` - загрузка фотографий в SharePoint
+**Prozess:**
+1. Das System startet nacheinander alle Module:
+   - `metadata_schema.py` - Hochladen des Metadatenschemas
+   - `photo_metadata.py` - Hochladen von Fotografien und Extrahieren von EXIF
+   - `openai_analyzer.py` - Analyse von Fotografien mit OpenAI
+   - `metadata_generator.py` - Generierung von Metadaten
+   - `sharepoint_uploader.py` - Hochladen von Fotografien in SharePoint
 
-**Особенности:**
-- Полностью автоматический процесс
-- Обработка ошибок на каждом этапе
-- Логирование всех действий
+**Besonderheiten:**
+- Vollständig automatisierter Prozess
+- Fehlerbehandlung in jedem Schritt
+- Protokollierung aller Aktionen
 
-**Результат:**
-- Полный цикл обработки фотографий от загрузки до загрузки обратно с обогащенными метаданными
+**Ergebnis:**
+- Vollständiger Verarbeitungszyklus von Fotografien von der Hochladung bis zur Rückladung mit angereicherten Metadaten
 
-## Ключевые технические аспекты
+## Schlüsseltechnische Aspekte
 
-### 1. Обработка EXIF-метаданных
+### 1. Verarbeitung von EXIF-Metadaten
 
-- Извлечение метаданных с помощью библиотеки PIL
-- Форматирование GPS-координат в читаемый вид
-- Сохранение метаданных в YAML-формате
-- Использование метаданных для обогащения промпта OpenAI
+- Extraktion von Metadaten mit Hilfe der PIL-Bibliothek
+- Formatierung von GPS-Koordinaten in ein lesbares Format
+- Speicherung von Metadaten im YAML-Format
+- Nutzung von Metadaten zur Anreicherung des OpenAI-Prompts
 
-### 2. Интеграция с OpenAI
+### 2. Integration mit OpenAI
 
-- Использование модели GPT-4o для анализа изображений
-- Формирование промпта с включением EXIF-данных
-- Оптимизация изображений перед отправкой
-- Парсинг и валидация JSON-ответа
+- Verwendung des Modells GPT-4o zur Analyse von Bildern
+- Erstellung des Prompts mit Einbeziehung von EXIF-Daten
+- Optimierung von Bildern vor dem Versand
+- Parsing und Validierung der JSON-Antwort
 
-### 3. Интеллектуальное объединение данных
+### 3. Intelligente Verknüpfung von Daten
 
-- Определение приоритетов источников для разных полей
-- Маппинг EXIF-тегов на поля SharePoint
-- Валидация значений в соответствии со схемой
-- Геокодирование GPS-координат
+- Bestimmung der Prioritäten der Quellen für verschiedene Felder
+- Mapping von EXIF-Tags auf SharePoint-Felder
+- Validierung der Werte gemäß dem Schema
+- Geokodierung von GPS-Koordinaten
 
-### 4. Интеграция с SharePoint
+### 4. Integration mit SharePoint
 
-- Аутентификация с использованием учетных данных
-- Загрузка и выгрузка файлов
-- Обновление метаданных файлов
-- Работа с библиотеками и списками
+- Authentifizierung mit Hilfe der Anmeldeinformationen
+- Hochladen und Herunterladen von Dateien
+- Aktualisierung der Metadaten von Dateien
+- Arbeiten mit Bibliotheken und Listen
 
-### 5. Оптимизация производительности
+### 5. Leistungsoptimierung
 
-- Пакетная обработка файлов
-- Параллельная обработка с использованием ThreadPoolExecutor
-- Кэширование результатов
-- Механизмы повторных попыток
+- Batchverarbeitung von Dateien
+- Parallelverarbeitung mit Hilfe von ThreadPoolExecutor
+- Caching der Ergebnisse
+- Mechanismen für Wiederholungsversuche
 
-### 6. Отказоустойчивость
+### 6. Fehlertoleranz
 
-- Обработка ошибок на каждом этапе
-- Логирование всех действий
-- Сохранение промежуточных результатов
-- Реестр обработанных файлов для предотвращения повторной обработки
+- Fehlerbehandlung in jedem Schritt
+- Protokollierung aller Aktionen
+- Speicherung von Zwischenergebnissen
+- Register der verarbeiteten Dateien zur Vermeidung von Doppelverarbeitungen
 
-## Схема потока данных
+## Datenflussdiagramm
 
 ```
-SharePoint (Referenzfotos) --> Загрузка фотографий --> Извлечение EXIF --> Анализ OpenAI --> Генерация метаданных --> Загрузка в SharePoint
+SharePoint (Referenzfotos) --> Hochladen von Fotografien --> Extraktion von EXIF --> Analyse OpenAI --> Generierung von Metadaten --> Hochladen in SharePoint
     |                                                       |                   |                      |
     |                                                       v                   v                      |
-    |                                                EXIF-метаданные --> Интеллектуальное объединение |
+    |                                                EXIF-Metadaten --> Intelligente Verknüpfung |
     |                                                                           |                      |
     v                                                                           v                      v
-Схема метаданных ------------------------------------------------> Валидация метаданных --> Обновление метаданных
+Metadatenschema ------------------------------------------------> Validierung der Metadaten --> Aktualisierung der Metadaten
 ```
 
-## Заключение
+## Fazit
 
-Данный проект представляет собой комплексное решение для автоматизации обработки фотографий строительных проектов. Система интегрирует различные технологии (SharePoint, OpenAI, геокодирование) для создания полного цикла обработки фотографий с минимальным участием человека.
+Dieses Projekt stellt eine umfassende Lösung zur Automatisierung der Verarbeitung von Fotografien von Bauprojekten dar. Das System integriert verschiedene Technologien (SharePoint, OpenAI, Geokodierung), um einen vollständigen Verarbeitungszyklus für Fotografien mit minimalem menschlichen Eingriff zu schaffen.
 
-Ключевыми особенностями являются интеллектуальное объединение данных из разных источников, использование искусственного интеллекта для анализа изображений и автоматическое обогащение метаданных с учетом контекста фотографий.
+Zu den wichtigsten Merkmalen gehören die intelligente Verknüpfung von Daten aus verschiedenen Quellen, die Nutzung von künstlicher Intelligenz zur Analyse von Bildern und die automatische Anreicherung von Metadaten unter Berücksichtigung des Kontexts der Fotografien.
 
-Система спроектирована с учетом масштабируемости, отказоустойчивости и производительности, что позволяет обрабатывать большие объемы фотографий эффективно и надежно.
+Das System wurde mit Blick auf Skalierbarkeit, Fehlertoleranz und Leistung entworfen, was eine effiziente und zuverlässige Verarbeitung großer Mengen von Fotografien ermöglicht.

@@ -26,6 +26,49 @@ def allowed_file(filename):
     ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'webp'}
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def validate_image_content(file):
+    """Validate that the file is actually an image by checking its content.
+
+    Args:
+        file: File object to validate
+
+    Returns:
+        bool: True if the file is a valid image, False otherwise
+    """
+    try:
+        # Save the current position
+        current_position = file.tell()
+
+        # Read the first few bytes to check the file signature
+        header = file.read(8)
+        file.seek(current_position)  # Reset file position
+
+        # Check common image signatures
+        # JPEG: starts with FF D8
+        if header.startswith(b'\xFF\xD8'):
+            return True
+        # PNG: starts with 89 50 4E 47 0D 0A 1A 0A
+        elif header.startswith(b'\x89PNG\r\n\x1a\n'):
+            return True
+        # GIF: starts with GIF87a or GIF89a
+        elif header.startswith(b'GIF87a') or header.startswith(b'GIF89a'):
+            return True
+        # BMP: starts with BM
+        elif header.startswith(b'BM'):
+            return True
+        # TIFF: starts with II or MM
+        elif header.startswith(b'II') or header.startswith(b'MM'):
+            return True
+        # WEBP: starts with RIFF and contains WEBP
+        elif header.startswith(b'RIFF') and b'WEBP' in file.read(16):
+            file.seek(current_position)  # Reset file position again
+            return True
+
+        return False
+    except Exception as e:
+        logger.error(f"Error validating image content: {str(e)}")
+        return False
+
 @bp.route('/')
 @bp.route('/<tab>')
 def index(tab=None):
@@ -276,7 +319,7 @@ def upload():
     uploaded_count = 0
 
     for file in files:
-        if file and allowed_file(file.filename):
+        if file and allowed_file(file.filename) and validate_image_content(file):
             filename = secure_filename(file.filename)
             file_path = os.path.join(path_manager.downloads_dir, filename)
 
@@ -284,6 +327,15 @@ def upload():
             file.save(file_path)
             uploaded_count += 1
             logger.info(f"Uploaded file: {filename}")
+        else:
+            if file and not allowed_file(file.filename):
+                logger.warning(f"Invalid file extension: {file.filename}")
+                flash(f"Invalid file extension: {file.filename}", "danger")
+            elif file and not validate_image_content(file):
+                logger.warning(f"Invalid image content: {file.filename}")
+                flash(f"File {file.filename} does not appear to be a valid image", "danger")
+            else:
+                logger.warning(f"Invalid file: {file.filename}")
 
     if uploaded_count > 0:
         flash(f'Successfully uploaded {uploaded_count} photos', 'success')
