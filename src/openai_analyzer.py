@@ -26,7 +26,7 @@ from src.photo_metadata import extract_formatted_exif
 # Get logger
 logger = get_logger('openai_analyzer')
 
-# Get configuration
+# Initial configuration
 config = get_config()
 
 # OpenAI settings
@@ -34,14 +34,28 @@ openai.api_key = config.openai.api_key
 OPENAI_CONCURRENCY_LIMIT = config.openai.concurrency_limit
 MAX_TOKENS = config.openai.max_tokens
 
-# OpenAI prompt settings
-OPENAI_PROMPT_ROLE = config.openai.prompt_role
-OPENAI_PROMPT_INSTRUCTIONS_PRE = config.openai.prompt_instructions_pre
-OPENAI_PROMPT_INSTRUCTIONS_POST = config.openai.prompt_instructions_post
-OPENAI_PROMPT_EXAMPLE = config.openai.prompt_example
-
 # Metadata schema file
 METADATA_SCHEMA_FILE = config.file.metadata_schema_file
+
+
+def get_openai_prompt_settings():
+    """
+    Get the current OpenAI prompt settings from the configuration.
+    This allows the settings to be updated without restarting the application.
+
+    Returns:
+        tuple: (role, instructions_pre, instructions_post, example)
+    """
+    # Get the latest configuration
+    current_config = get_config()
+
+    # Return the current prompt settings
+    return (
+        current_config.openai.prompt_role,
+        current_config.openai.prompt_instructions_pre,
+        current_config.openai.prompt_instructions_post,
+        current_config.openai.prompt_example
+    )
 
 # Get path manager for directories
 path_manager = get_path_manager()
@@ -140,8 +154,11 @@ def prepare_openai_prompt(schema):
         # Get field descriptions
         fields_description = prepare_fields_description(schema)
 
+        # Get current prompt settings
+        role, instructions_pre, instructions_post, example = get_openai_prompt_settings()
+
         # Construct the full prompt
-        prompt = f"{OPENAI_PROMPT_ROLE}\n\n{OPENAI_PROMPT_INSTRUCTIONS_PRE}\n\n{fields_description}\n\n{OPENAI_PROMPT_INSTRUCTIONS_POST}\n\n{OPENAI_PROMPT_EXAMPLE}"
+        prompt = f"{role}\n\n{instructions_pre}\n\n{fields_description}\n\n{instructions_post}\n\n{example}"
 
         return prompt
     except Exception as e:
@@ -167,11 +184,14 @@ def prepare_openai_prompt_with_exif(schema, image_path):
         # Extract formatted EXIF data
         exif_data = extract_formatted_exif(image_path)
 
+        # Get current prompt settings
+        role, instructions_pre, instructions_post, example = get_openai_prompt_settings()
+
         # Create EXIF section
         exif_section = f"""\nEXIF METADATA FROM THE IMAGE:\n{exif_data}\n\nPlease use this EXIF information to enhance your analysis. Pay special attention to:\n1. Date and time when the photo was taken\n2. GPS coordinates and location information\n3. Camera and lens information that might indicate the quality and type of photography\n4. Any description or copyright information embedded in the image\n\nNow, analyze the image considering both the visual content and the EXIF metadata provided above.\n"""
 
         # Construct the full prompt with EXIF data
-        prompt = f"{OPENAI_PROMPT_ROLE}\n\n{OPENAI_PROMPT_INSTRUCTIONS_PRE}{exif_section}\n\n{fields_description}\n\n{OPENAI_PROMPT_INSTRUCTIONS_POST}\n\n{OPENAI_PROMPT_EXAMPLE}"
+        prompt = f"{role}\n\n{instructions_pre}{exif_section}\n\n{fields_description}\n\n{instructions_post}\n\n{example}"
 
         return prompt
     except Exception as e:

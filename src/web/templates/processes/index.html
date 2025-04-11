@@ -14,9 +14,9 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5><i class="fas fa-tasks"></i> Running Processes</h5>
                 <div>
-                    <button id="refreshProcesses" class="btn btn-sm btn-outline-primary">
+                    <a href="{{ url_for('processes.index') }}" class="btn btn-sm btn-outline-primary">
                         <i class="fas fa-sync"></i> Refresh
-                    </button>
+                    </a>
                 </div>
             </div>
             <div class="card-body">
@@ -106,64 +106,17 @@
 <script>
     $(document).ready(function() {
         // Auto-refresh processes every 5 seconds
-        setInterval(refreshProcesses, 5000);
-        
-        // Manual refresh button
-        $('#refreshProcesses').click(function() {
-            refreshProcesses();
-        });
-        
+        setInterval(function() {
+            location.reload();
+        }, 5000);
+
         // Kill process modal
         $('.kill-process').click(function() {
             var pid = $(this).data('pid');
             $('#killProcessForm').attr('action', '{{ url_for("processes.kill_process", pid="") }}' + pid);
         });
-        
-        function refreshProcesses() {
-            $.ajax({
-                url: '{{ url_for("processes.active") }}',
-                type: 'GET',
-                dataType: 'json',
-                success: function(data) {
-                    // Update existing rows
-                    for (var pid in data) {
-                        var process = data[pid];
-                        var row = $('tr[data-pid="' + pid + '"]');
-                        
-                        if (row.length) {
-                            // Update status
-                            var statusHtml = '';
-                            if (process.status === 'running') {
-                                statusHtml = '<span class="badge badge-info">Running</span>';
-                                row.removeClass('table-success table-danger table-warning').addClass('table-info');
-                            } else if (process.status === 'starting') {
-                                statusHtml = '<span class="badge badge-primary">Starting</span>';
-                                row.removeClass('table-success table-danger table-warning').addClass('table-info');
-                            } else if (process.status === 'finished') {
-                                statusHtml = '<span class="badge badge-success">Finished</span>';
-                                row.removeClass('table-info table-danger table-warning').addClass('table-success');
-                            } else if (process.status === 'error') {
-                                statusHtml = '<span class="badge badge-danger">Error</span>';
-                                row.removeClass('table-info table-success table-warning').addClass('table-danger');
-                            } else if (process.status === 'killed') {
-                                statusHtml = '<span class="badge badge-warning">Killed</span>';
-                                row.removeClass('table-info table-success table-danger').addClass('table-warning');
-                            } else {
-                                statusHtml = '<span class="badge badge-secondary">' + process.status + '</span>';
-                            }
-                            
-                            row.find('.process-status').html(statusHtml);
-                            
-                            // Update duration
-                            row.find('.process-duration').text(process.duration);
-                        } else {
-                            // Add new row
-                            location.reload();
-                        }
-                    }
-                }
-            });
-        }
+
+
     });
 </script>
 {% endblock %}

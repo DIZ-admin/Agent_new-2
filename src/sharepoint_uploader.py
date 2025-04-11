@@ -43,12 +43,20 @@ def get_files_for_upload():
     try:
         upload_files = []
 
+        # Get registry to check if files have already been uploaded
+        registry = get_registry()
+
         # Check for files in upload directory
         for filename in os.listdir(UPLOAD_DIR):
             file_path = UPLOAD_DIR / filename
             if file_path.is_file():
                 # Skip metadata files
                 if filename.endswith('.json') or filename.endswith('.yml'):
+                    continue
+
+                # Check if file has already been uploaded
+                if registry.is_uploaded(filename):
+                    logger.info(f"Skipping already uploaded file: {filename}")
                     continue
 
                 # Check if metadata exists
@@ -59,6 +67,13 @@ def get_files_for_upload():
                 if metadata_path.exists():
                     # Load metadata
                     metadata = load_json_file(metadata_path)
+
+                    # Check if original filename is different and has been uploaded
+                    if 'OriginalName' in metadata and metadata['OriginalName']:
+                        original_name = metadata['OriginalName']
+                        if original_name != filename and registry.is_uploaded(original_name):
+                            logger.info(f"Skipping already uploaded file (by original name): {filename} (original: {original_name})")
+                            continue
 
                     # Check if original metadata exists
                     original_metadata_path_to_use = None

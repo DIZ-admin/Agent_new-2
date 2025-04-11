@@ -313,8 +313,17 @@ class ProcessTracker:
             formatted_info["last_updated_formatted"] = last_updated.strftime("%Y-%m-%d %H:%M:%S")
 
             # Calculate duration
-            duration = time.time() - process_info.get("start_time", time.time())
+            start_time = process_info.get("start_time", time.time())
+
+            # If process is finished or has error, use last_updated as end time
+            if process_info.get("status") in ["finished", "error", "killed"]:
+                end_time = process_info.get("last_updated", time.time())
+            else:
+                end_time = time.time()
+
+            duration = end_time - start_time
             formatted_info["duration"] = self._format_duration(duration)
+            formatted_info["duration_seconds"] = duration
 
             return formatted_info
         except Exception as e:

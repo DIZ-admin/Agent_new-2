@@ -77,25 +77,48 @@ def load_config() -> AppConfig:
 
     Returns:
         AppConfig: Application configuration
-    
+
     Raises:
         ValueError: If required configuration is missing
     """
     # Get base directory
     base_dir = get_base_dir()
-    
+
     # Define directories
     config_dir = base_dir / "config"
     data_dir = base_dir / "data"
     logs_dir = base_dir / "logs"
-    
+
     # Ensure directories exist
     logs_dir.mkdir(exist_ok=True)
     data_dir.mkdir(exist_ok=True)
-    
+
     # Load environment variables
-    load_dotenv(config_dir / "config.env")
-    
+    # We'll load the file manually to handle multiline values correctly
+    env_path = config_dir / "config.env"
+    if env_path.exists():
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip()
+
+                    # Handle quoted values
+                    if value.startswith('"""') and value.endswith('"""'):
+                        # Triple-quoted multiline string
+                        value = value[3:-3]
+                    elif value.startswith('"') and value.endswith('"'):
+                        # Regular quoted string
+                        value = value[1:-1]
+
+                    # Set environment variable
+                    os.environ[key] = value
+
     # Validate required variables
     required_vars = [
         "SHAREPOINT_SITE_URL",
@@ -106,11 +129,11 @@ def load_config() -> AppConfig:
         "METADATA_SCHEMA_FILE",
         "OPENAI_API_KEY"
     ]
-    
+
     missing_vars = [var for var in required_vars if not os.getenv(var)]
     if missing_vars:
         raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
-    
+
     # Create configuration objects
     sharepoint_config = SharePointConfig(
         site_url=os.getenv("SHAREPOINT_SITE_URL", ""),
@@ -121,13 +144,13 @@ def load_config() -> AppConfig:
         max_connection_attempts=int(os.getenv("MAX_CONNECTION_ATTEMPTS", "3")),
         connection_retry_delay=int(os.getenv("CONNECTION_RETRY_DELAY", "5"))
     )
-    
+
     file_config = FileConfig(
         metadata_schema_file=os.getenv("METADATA_SCHEMA_FILE", ""),
         target_filename_mask=os.getenv("TARGET_FILENAME_MASK", ""),
         max_file_size=int(os.getenv("MAX_FILE_SIZE", "15728640"))  # Default 15MB
     )
-    
+
     openai_config = OpenAIConfig(
         api_key=os.getenv("OPENAI_API_KEY", ""),
         concurrency_limit=int(os.getenv("OPENAI_CONCURRENCY_LIMIT", "5")),
@@ -137,12 +160,12 @@ def load_config() -> AppConfig:
         prompt_instructions_post=os.getenv("OPENAI_PROMPT_INSTRUCTIONS_POST", ""),
         prompt_example=os.getenv("OPENAI_PROMPT_EXAMPLE", "")
     )
-    
+
     logging_config = LoggingConfig(
         log_level=os.getenv("LOG_LEVEL", "INFO"),
         log_file=os.getenv("LOG_FILE", "sharepoint_connector.log")
     )
-    
+
     # Create and return the main configuration
     return AppConfig(
         sharepoint=sharepoint_config,
@@ -158,19 +181,52 @@ def load_config() -> AppConfig:
 
 # Global configuration instance
 _config = None
+_config_last_modified = 0
 
 
-def get_config() -> AppConfig:
+def get_config(force_reload=False) -> AppConfig:
     """
     Get the application configuration.
-    
+
+    Args:
+        force_reload (bool): Force reload the configuration
+
     Returns:
         AppConfig: Application configuration
     """
-    global _config
-    if _config is None:
+    global _config, _config_last_modified
+
+    # Get the config.env file path
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    config_dir = os.path.join(base_dir, 'config')
+    env_path = os.path.join(config_dir, 'config.env')
+
+    # Check if the file has been modified
+    try:
+        current_mtime = os.path.getmtime(env_path)
+        file_changed = current_mtime > _config_last_modified
+    except Exception:
+        file_changed = False
+
+    # Reload if needed
+    if _config is None or force_reload or file_changed:
         _config = load_config()
+        try:
+            _config_last_modified = os.path.getmtime(env_path)
+        except Exception:
+            _config_last_modified = 0
+
     return _config
+
+
+def reload_config() -> AppConfig:
+    """
+    Force reload the application configuration.
+
+    Returns:
+        AppConfig: Reloaded application configuration
+    """
+    return get_config(force_reload=True)
 
 
 # For direct testing

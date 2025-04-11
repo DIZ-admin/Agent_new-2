@@ -9,7 +9,7 @@ import json
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from datetime import datetime
 
-from src.utils.config import get_config
+from src.utils.config import get_config, reload_config
 from src.utils.logging import get_logger
 from src.utils.paths import get_path_manager
 
@@ -46,7 +46,11 @@ def index():
         'OPENAI_CONCURRENCY_LIMIT': os.environ.get('OPENAI_CONCURRENCY_LIMIT', ''),
         'MAX_TOKENS': os.environ.get('MAX_TOKENS', ''),
         'LOG_LEVEL': os.environ.get('LOG_LEVEL', ''),
-        'LOG_FILE': os.environ.get('LOG_FILE', '')
+        'LOG_FILE': os.environ.get('LOG_FILE', ''),
+        'OPENAI_PROMPT_ROLE': os.environ.get('OPENAI_PROMPT_ROLE', ''),
+        'OPENAI_PROMPT_INSTRUCTIONS_PRE': os.environ.get('OPENAI_PROMPT_INSTRUCTIONS_PRE', ''),
+        'OPENAI_PROMPT_INSTRUCTIONS_POST': os.environ.get('OPENAI_PROMPT_INSTRUCTIONS_POST', ''),
+        'OPENAI_PROMPT_EXAMPLE': os.environ.get('OPENAI_PROMPT_EXAMPLE', '')
     }
 
     return render_template('settings/index.html',
@@ -100,7 +104,13 @@ def update_env():
             key = key.strip()
 
             if key in env_vars and env_vars[key]:
-                new_lines.append(f"{key}={env_vars[key]}")
+                value = env_vars[key]
+                if '\n' in value:
+                    # For multiline values, use triple quotes and preserve newlines
+                    new_lines.append(f'{key}="""{value}"""')
+                else:
+                    # For single line values, use regular quotes
+                    new_lines.append(f'{key}="{value}"')
             else:
                 new_lines.append(line)
 
@@ -108,8 +118,11 @@ def update_env():
         with open(env_path, 'w', encoding='utf-8') as f:
             f.write('\n'.join(new_lines))
 
-        flash("Settings updated successfully. Restart the application for changes to take effect.", "success")
-        logger.info("Environment variables updated via web interface")
+        # Reload configuration
+        reload_config()
+
+        flash("Settings updated successfully. Changes have been applied.", "success")
+        logger.info("Environment variables updated via web interface and configuration reloaded")
     except Exception as e:
         flash(f"Error updating settings: {str(e)}", "danger")
         logger.error(f"Error updating environment variables: {str(e)}")
@@ -151,5 +164,76 @@ def clean_directory(directory):
     except Exception as e:
         flash(f"Error cleaning {directory} directory: {str(e)}", "danger")
         logger.error(f"Error cleaning {directory} directory: {str(e)}")
+
+    return redirect(url_for('settings.index'))
+
+@bp.route('/update_openai_prompt', methods=['POST'])
+def update_openai_prompt():
+    """Update OpenAI prompt settings."""
+    # Get form data
+    prompt_vars = {
+        'OPENAI_PROMPT_ROLE': request.form.get('OPENAI_PROMPT_ROLE', ''),
+        'OPENAI_PROMPT_INSTRUCTIONS_PRE': request.form.get('OPENAI_PROMPT_INSTRUCTIONS_PRE', ''),
+        'OPENAI_PROMPT_INSTRUCTIONS_POST': request.form.get('OPENAI_PROMPT_INSTRUCTIONS_POST', ''),
+        'OPENAI_PROMPT_EXAMPLE': request.form.get('OPENAI_PROMPT_EXAMPLE', '')
+    }
+
+    # Update environment variables in config.env
+    try:
+        config_dir = get_config().config_dir
+        env_path = os.path.join(config_dir, 'config.env')
+
+        # Read existing file
+        with open(env_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+
+        # Update values
+        new_lines = []
+        updated_keys = set()
+
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                new_lines.append(line)
+                continue
+
+            if '=' in line:
+                key, value = line.split('=', 1)
+                key = key.strip()
+
+                if key in prompt_vars:
+                    # Properly format the value for .env file
+                    # Use triple quotes for multiline values
+                    value = prompt_vars[key]
+                    if '\n' in value:
+                        # For multiline values, use triple quotes and preserve newlines
+                        new_lines.append(f'{key}="""{value}"""')
+                    else:
+                        # For single line values, use regular quotes
+                        new_lines.append(f'{key}="{value}"')
+                    updated_keys.add(key)
+                else:
+                    new_lines.append(line)
+            else:
+                new_lines.append(line)
+
+        # Add any keys that weren't in the file
+        for key, value in prompt_vars.items():
+            if key not in updated_keys:
+                escaped_value = value.replace('"', '\\"').replace('\n', '\\n')
+                new_lines.append(f'{key}="{escaped_value}"')
+
+        # Write back to file
+        with open(env_path, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(new_lines))
+
+        # Reload configuration
+        reload_config()
+
+        flash("OpenAI prompt settings updated successfully. Changes have been applied.", "success")
+        logger.info("OpenAI prompt settings updated via web interface and configuration reloaded")
+    except Exception as e:
+        flash(f"Error updating OpenAI prompt settings: {str(e)}", "danger")
+        logger.error(f"Error updating OpenAI prompt settings: {str(e)}")
 
     return redirect(url_for('settings.index'))

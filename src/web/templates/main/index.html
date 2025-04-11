@@ -136,13 +136,16 @@
                             <h6 class="mb-1"><i class="fas fa-brain text-success"></i> Processed: {{ activity.filename }}</h6>
                             <small>{{ activity.timestamp|datetime }}</small>
                         </div>
-                        <small>Hash: {{ activity.info.hash[:8] }}...</small>
+                        <small>Size: {{ activity.info.size|filesizeformat }}</small>
                         {% elif activity.type == 'uploaded' %}
                         <div class="d-flex w-100 justify-content-between">
                             <h6 class="mb-1"><i class="fas fa-cloud-upload-alt text-primary"></i> Uploaded: {{ activity.filename }}</h6>
                             <small>{{ activity.timestamp|datetime }}</small>
                         </div>
-                        <small>SharePoint ID: {{ activity.info.sharepoint_id }}</small>
+                        <small>Size: {{ activity.info.size|filesizeformat }}</small>
+                        {% if activity.info.metadata %}
+                        <small class="d-block">Has metadata</small>
+                        {% endif %}
                         {% endif %}
                     </div>
                     {% endfor %}
