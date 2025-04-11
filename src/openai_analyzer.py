@@ -10,6 +10,7 @@ import os
 import json
 import time
 import base64
+import re
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 import openai
@@ -41,12 +42,38 @@ METADATA_SCHEMA_FILE = config.file.metadata_schema_file
 def get_openai_prompt_settings():
     """
     Get the current OpenAI prompt settings from the configuration.
+    Tries to load from optimized_prompt.env first, falls back to config settings.
     This allows the settings to be updated without restarting the application.
 
     Returns:
         tuple: (role, instructions_pre, instructions_post, example)
     """
-    # Get the latest configuration
+    # Try to load from optimized prompt file first
+    optimized_prompt_path = os.path.join('config', 'optimized_prompt.env')
+    if os.path.exists(optimized_prompt_path):
+        logger.info("Using optimized prompt settings")
+        try:
+            # Load optimized prompt settings
+            with open(optimized_prompt_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            # Extract settings using regex
+            role_match = re.search(r'OPENAI_PROMPT_ROLE="(.+?)"', content, re.DOTALL)
+            instructions_pre_match = re.search(r'OPENAI_PROMPT_INSTRUCTIONS_PRE="(.+?)"', content, re.DOTALL)
+            instructions_post_match = re.search(r'OPENAI_PROMPT_INSTRUCTIONS_POST="(.+?)"', content, re.DOTALL)
+            example_match = re.search(r'OPENAI_PROMPT_EXAMPLE="(.+?)"', content, re.DOTALL)
+
+            role = role_match.group(1) if role_match else ''
+            instructions_pre = instructions_pre_match.group(1) if instructions_pre_match else ''
+            instructions_post = instructions_post_match.group(1) if instructions_post_match else ''
+            example = example_match.group(1) if example_match else ''
+
+            return role, instructions_pre, instructions_post, example
+        except Exception as e:
+            logger.error(f"Error loading optimized prompt settings: {str(e)}")
+            logger.info("Falling back to default prompt settings")
+
+    # Fall back to configuration
     current_config = get_config()
 
     # Return the current prompt settings
@@ -239,7 +266,7 @@ def encode_image_to_base64(image_path):
         raise
 
 
-def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True):
+def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True, use_custom_prompt=False, custom_prompt=None):
     """
     Analyze a photo using OpenAI's API with retry mechanism.
 
@@ -248,6 +275,8 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True):
         schema (dict): Metadata schema dictionary
         max_retries (int): Maximum number of retry attempts
         use_exif (bool): Whether to include EXIF data in the prompt
+        use_custom_prompt (bool): Whether to use a custom prompt
+        custom_prompt (str): Custom prompt to use
 
     Returns:
         dict: Analysis results
@@ -257,8 +286,11 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True):
         try:
             logger.info(f"Analyzing photo: {os.path.basename(image_path)} (Attempt {retry_count + 1}/{max_retries})")
 
-            # Prepare prompt with or without EXIF data
-            if use_exif:
+            # Determine which prompt to use
+            if use_custom_prompt and custom_prompt:
+                prompt = custom_prompt
+                logger.info(f"Using custom prompt for {os.path.basename(image_path)}")
+            elif use_exif:
                 prompt = prepare_openai_prompt_with_exif(schema, image_path)
                 logger.info(f"Using prompt with EXIF data for {os.path.basename(image_path)}")
             else:
@@ -269,8 +301,9 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True):
             base64_image = encode_image_to_base64(image_path)
 
             # Create OpenAI API request
+            # Use GPT-4 Vision Preview for better image analysis
             response = openai.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4-vision-preview",  # Better model for image analysis
                 messages=[
                     {
                         "role": "system",
@@ -279,17 +312,19 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True):
                     {
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": "Analyze this image:"},
+                            {"type": "text", "text": "Analyze this image in detail. Pay special attention to construction materials, architectural elements, and design features. Provide a comprehensive analysis that captures all relevant aspects of the wooden construction:"},
                             {
                                 "type": "image_url",
                                 "image_url": {
-                                    "url": f"data:image/jpeg;base64,{base64_image}"
+                                    "url": f"data:image/jpeg;base64,{base64_image}",
+                                    "detail": "high"  # Request high detail analysis
                                 }
                             }
                         ]
                     }
                 ],
-                max_tokens=MAX_TOKENS
+                max_tokens=MAX_TOKENS,
+                temperature=0.5  # Lower temperature for more precise responses
             )
 
             # Extract and parse JSON response
@@ -374,6 +409,7 @@ def save_analysis_to_json(analysis, image_path):
 def process_photo_with_openai(photo_info, schema):
     """
     Process a photo with OpenAI API.
+    Uses context from similar photos to improve analysis quality.
 
     Args:
         photo_info (dict): Photo information dictionary
@@ -383,8 +419,28 @@ def process_photo_with_openai(photo_info, schema):
         dict: Processed photo information
     """
     try:
-        # Analyze photo with OpenAI using EXIF data
-        analysis = analyze_photo_with_openai(photo_info['local_path'], schema, use_exif=True)
+        # Get context from similar photos
+        similar_photos_context = get_similar_photos_context(photo_info['local_path'])
+        if similar_photos_context:
+            logger.info(f"Using context from similar photos for: {photo_info['name']}")
+
+            # Prepare custom prompt with context
+            role, instructions_pre, instructions_post, example = get_openai_prompt_settings()
+
+            # Prepare field descriptions
+            fields_description = prepare_fields_description(schema)
+
+            # Add context to instructions
+            instructions_pre = f"{instructions_pre}{similar_photos_context}"
+
+            # Create custom prompt
+            custom_prompt = f"{role}\n\n{instructions_pre}\n\n{fields_description}\n\n{instructions_post}\n\n{example}"
+
+            # Analyze photo with OpenAI using custom prompt and EXIF data
+            analysis = analyze_photo_with_openai(photo_info['local_path'], schema, use_exif=True, use_custom_prompt=True, custom_prompt=custom_prompt)
+        else:
+            # Analyze photo with OpenAI using EXIF data
+            analysis = analyze_photo_with_openai(photo_info['local_path'], schema, use_exif=True)
 
         # Check if analysis contains an error
         if 'error' in analysis:
@@ -410,11 +466,81 @@ def process_photo_with_openai(photo_info, schema):
         return photo_info
 
 
+def get_similar_photos_context(photo_path, max_similar=3):
+    """
+    Find similar photos that have already been analyzed to provide context.
+
+    Args:
+        photo_path (str): Path to the current photo
+        max_similar (int): Maximum number of similar photos to include
+
+    Returns:
+        str: Context from similar photos or empty string if none found
+    """
+    try:
+        # Get the directory containing the photo
+        photo_dir = os.path.dirname(photo_path)
+        photo_name = os.path.basename(photo_path)
+
+        # Look for analyzed photos in the same directory
+        analysis_dir = path_manager.analysis_dir
+        context = ""
+        similar_count = 0
+
+        # Check if analysis directory exists
+        if not os.path.exists(analysis_dir):
+            return ""
+
+        # Get all analysis files
+        analysis_files = [f for f in os.listdir(analysis_dir) if f.endswith('_analysis.json')]
+
+        # Sort by modification time (newest first)
+        analysis_files.sort(key=lambda f: os.path.getmtime(os.path.join(analysis_dir, f)), reverse=True)
+
+        # Get context from up to max_similar recent analyses
+        for analysis_file in analysis_files:
+            if similar_count >= max_similar:
+                break
+
+            analysis_path = os.path.join(analysis_dir, analysis_file)
+            try:
+                with open(analysis_path, 'r', encoding='utf-8') as f:
+                    analysis_data = json.load(f)
+
+                # Skip if this is the same photo
+                if analysis_file == photo_name.replace('.jpg', '_analysis.json').replace('.jpeg', '_analysis.json'):
+                    continue
+
+                # Add to context
+                if 'Titel' in analysis_data and 'Beschreibung' in analysis_data:
+                    context += f"Similar photo: {analysis_data['Titel']}\n"
+                    context += f"Description: {analysis_data['Beschreibung']}\n"
+                    if 'Material' in analysis_data:
+                        materials = analysis_data['Material']
+                        if isinstance(materials, list):
+                            context += f"Materials: {', '.join(materials)}\n"
+                        else:
+                            context += f"Materials: {materials}\n"
+                    context += "\n"
+                    similar_count += 1
+            except Exception as e:
+                logger.warning(f"Error reading analysis file {analysis_file}: {str(e)}")
+                continue
+
+        if context:
+            return f"\n\nCONTEXT FROM SIMILAR PHOTOS:\n{context}\nUse this context as reference, but ensure your analysis is specific to the current image."
+        return ""
+    except Exception as e:
+        logger.error(f"Error getting similar photos context: {str(e)}")
+        return ""
+
+
 def process_photos_with_openai(photos, schema):
     """
     Process multiple photos with OpenAI API using thread pool.
     Automatically retries photos that failed due to JSON parsing errors.
     Skips photos that have already been analyzed based on their hash.
+    Uses context from similar photos to improve analysis quality.
 
     Args:
         photos (list): List of photo information dictionaries
