@@ -98,154 +98,177 @@ def index(tab=None):
     downloads = []
     logger.info(f"Сканирование директории downloads: {path_manager.downloads_dir}")
     try:
-        files = os.listdir(path_manager.downloads_dir)
-        # Фильтруем только файлы с разрешенными расширениями
-        image_files = [f for f in files if allowed_file(f)]
-        logger.info(f"Найдено файлов в downloads: {len(files)}, из них изображений: {len(image_files)}")
-        for filename in image_files:
-            file_path = os.path.join(path_manager.downloads_dir, filename)
-            logger.info(f"Добавление файла: {filename}")
-            downloads.append({
-                'name': filename,
-                'path': file_path,
-                'size': os.path.getsize(file_path),
-                'modified': datetime.fromtimestamp(os.path.getmtime(file_path))
-            })
+        # Используем os.scandir вместо os.listdir для более эффективного сканирования
+        with os.scandir(path_manager.downloads_dir) as entries:
+            # Фильтруем только файлы с разрешенными расширениями
+            image_files = [entry for entry in entries if entry.is_file() and allowed_file(entry.name)]
+
+            logger.info(f"Найдено изображений в downloads: {len(image_files)}")
+
+            # Создаем список файлов с минимальным количеством системных вызовов
+            for entry in image_files:
+                # os.scandir предоставляет информацию о файле без дополнительных вызовов
+                stat_info = entry.stat()
+                downloads.append({
+                    'name': entry.name,
+                    'path': entry.path,
+                    'size': stat_info.st_size,
+                    'modified': datetime.fromtimestamp(stat_info.st_mtime)
+                })
+                logger.debug(f"Добавление файла: {entry.name}")
     except Exception as e:
         logger.error(f"Ошибка при сканировании директории downloads: {str(e)}")
 
     analyzed = []
     logger.info(f"Сканирование директории analysis: {path_manager.analysis_dir}")
     try:
-        files = os.listdir(path_manager.analysis_dir)
-        # Фильтруем только файлы с расширением .json
-        json_files = [f for f in files if f.endswith('.json')]
-        logger.info(f"Найдено файлов в analysis: {len(files)}, из них JSON: {len(json_files)}")
-        for filename in json_files:
-            file_path = os.path.join(path_manager.analysis_dir, filename)
-            photo_name = filename.replace('_analysis.json', '')
-            logger.info(f"Добавление файла анализа: {filename}")
+        # Используем os.scandir для более эффективного сканирования
+        with os.scandir(path_manager.analysis_dir) as entries:
+            # Фильтруем только файлы с расширением .json
+            json_files = [entry for entry in entries if entry.is_file() and entry.name.endswith('.json')]
+            logger.info(f"Найдено JSON файлов в analysis: {len(json_files)}")
 
-            # Try to find the original photo
-            original_path = None
-            original_filename = None
+            for entry in json_files:
+                stat_info = entry.stat()
+                photo_name = entry.name.replace('_analysis.json', '')
+                logger.debug(f"Добавление файла анализа: {entry.name}")
 
-            # Сначала ищем в директории processed
-            processed_path = os.path.join(path_manager.processed_dir, photo_name)
-            if os.path.exists(processed_path):
-                original_path = processed_path
-                original_filename = photo_name
-            else:
-                # Пробуем с разными расширениями
-                for ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']:
-                    test_path = os.path.join(path_manager.processed_dir, photo_name + ext)
-                    if os.path.exists(test_path):
-                        original_path = test_path
-                        original_filename = photo_name + ext
-                        break
+                # Создаем кэш для хранения найденных оригинальных файлов
+                if not hasattr(index, 'original_photo_cache'):
+                    index.original_photo_cache = {}
 
-            # Если не нашли в processed, ищем в downloads
-            if not original_path:
-                downloads_path = os.path.join(path_manager.downloads_dir, photo_name)
-                if os.path.exists(downloads_path):
-                    original_path = downloads_path
-                    original_filename = photo_name
+                # Проверяем, есть ли файл в кэше
+                if photo_name in index.original_photo_cache:
+                    original_path, original_filename = index.original_photo_cache[photo_name]
                 else:
-                    # Пробуем с разными расширениями
-                    for ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']:
-                        test_path = os.path.join(path_manager.downloads_dir, photo_name + ext)
-                        if os.path.exists(test_path):
-                            original_path = test_path
-                            original_filename = photo_name + ext
-                            break
+                    # Try to find the original photo
+                    original_path = None
+                    original_filename = None
 
-            # Если не нашли в downloads, ищем в uploaded
-            if not original_path:
-                uploaded_path = os.path.join(path_manager.uploaded_dir, photo_name)
-                if os.path.exists(uploaded_path):
-                    original_path = uploaded_path
-                    original_filename = photo_name
-                else:
-                    # Пробуем с разными расширениями
-                    for ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']:
-                        test_path = os.path.join(path_manager.uploaded_dir, photo_name + ext)
-                        if os.path.exists(test_path):
-                            original_path = test_path
-                            original_filename = photo_name + ext
-                            break
+                    # Сначала ищем в директории processed
+                    processed_path = os.path.join(path_manager.processed_dir, photo_name)
+                    if os.path.exists(processed_path):
+                        original_path = processed_path
+                        original_filename = photo_name
+                    else:
+                        # Пробуем с разными расширениями
+                        for ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']:
+                            test_path = os.path.join(path_manager.processed_dir, photo_name + ext)
+                            if os.path.exists(test_path):
+                                original_path = test_path
+                                original_filename = photo_name + ext
+                                break
 
-            analyzed.append({
-                'name': photo_name,
-                'analysis_path': file_path,
-                'original_path': original_path,
-                'original_filename': original_filename,
-                'size': os.path.getsize(file_path),
-                'modified': datetime.fromtimestamp(os.path.getmtime(file_path))
-            })
+                    # Сохраняем результат в кэш
+                    index.original_photo_cache[photo_name] = (original_path, original_filename)
+
+                # Если не нашли в processed, ищем в downloads
+                if not original_path:
+                    downloads_path = os.path.join(path_manager.downloads_dir, photo_name)
+                    if os.path.exists(downloads_path):
+                        original_path = downloads_path
+                        original_filename = photo_name
+                    else:
+                        # Пробуем с разными расширениями
+                        for ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']:
+                            test_path = os.path.join(path_manager.downloads_dir, photo_name + ext)
+                            if os.path.exists(test_path):
+                                original_path = test_path
+                                original_filename = photo_name + ext
+                                break
+
+                # Если не нашли в downloads, ищем в uploaded
+                if not original_path:
+                    uploaded_path = os.path.join(path_manager.uploaded_dir, photo_name)
+                    if os.path.exists(uploaded_path):
+                        original_path = uploaded_path
+                        original_filename = photo_name
+                    else:
+                        # Пробуем с разными расширениями
+                        for ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']:
+                            test_path = os.path.join(path_manager.uploaded_dir, photo_name + ext)
+                            if os.path.exists(test_path):
+                                original_path = test_path
+                                original_filename = photo_name + ext
+                                break
+
+                # Добавляем файл анализа в список
+                analyzed.append({
+                    'name': photo_name,
+                    'analysis_path': entry.path,
+                    'original_path': original_path,
+                    'original_filename': original_filename,
+                    'size': stat_info.st_size,
+                    'modified': datetime.fromtimestamp(stat_info.st_mtime)
+                })
     except Exception as e:
         logger.error(f"Ошибка при сканировании директории analysis: {str(e)}")
 
     upload_ready = []
     logger.info(f"Сканирование директории upload: {path_manager.upload_dir}")
     try:
-        files = os.listdir(path_manager.upload_dir)
-        # Фильтруем только файлы с разрешенными расширениями
-        image_files = [f for f in files if allowed_file(f)]
-        logger.info(f"Найдено файлов в upload: {len(files)}, из них изображений: {len(image_files)}")
-        for filename in image_files:
-            file_path = os.path.join(path_manager.upload_dir, filename)
-            logger.info(f"Добавление файла для загрузки: {filename}")
+        # Используем os.scandir для более эффективного сканирования
+        with os.scandir(path_manager.upload_dir) as entries:
+            # Фильтруем только файлы с разрешенными расширениями
+            image_files = [entry for entry in entries if entry.is_file() and allowed_file(entry.name)]
+            logger.info(f"Найдено изображений в upload: {len(image_files)}")
 
-            # Check if metadata exists
-            metadata_path = os.path.join(path_manager.upload_metadata_dir, os.path.splitext(filename)[0] + '.json')
-            metadata = None
-            if os.path.exists(metadata_path):
-                try:
-                    with open(metadata_path, 'r', encoding='utf-8') as f:
-                        metadata = json.load(f)
-                except Exception as e:
-                    logger.error(f"Error loading metadata for {filename}: {str(e)}")
+            for entry in image_files:
+                stat_info = entry.stat()
+                logger.debug(f"Добавление файла для загрузки: {entry.name}")
 
-            upload_ready.append({
-                'name': filename,
-                'path': file_path,
-                'metadata_path': metadata_path if os.path.exists(metadata_path) else None,
-                'metadata': metadata,
-                'size': os.path.getsize(file_path),
-                'modified': datetime.fromtimestamp(os.path.getmtime(file_path))
-            })
+                # Check if metadata exists
+                metadata_path = os.path.join(path_manager.upload_metadata_dir, os.path.splitext(entry.name)[0] + '.json')
+                metadata = None
+                if os.path.exists(metadata_path):
+                    try:
+                        with open(metadata_path, 'r', encoding='utf-8') as f:
+                            metadata = json.load(f)
+                    except Exception as e:
+                        logger.error(f"Error loading metadata for {entry.name}: {str(e)}")
+
+                upload_ready.append({
+                    'name': entry.name,
+                    'path': entry.path,
+                    'metadata_path': metadata_path if os.path.exists(metadata_path) else None,
+                    'metadata': metadata,
+                    'size': stat_info.st_size,
+                    'modified': datetime.fromtimestamp(stat_info.st_mtime)
+                })
     except Exception as e:
         logger.error(f"Ошибка при сканировании директории upload: {str(e)}")
 
     uploaded = []
     logger.info(f"Сканирование директории uploaded: {path_manager.uploaded_dir}")
     try:
-        files = os.listdir(path_manager.uploaded_dir)
-        # Фильтруем только файлы с разрешенными расширениями
-        image_files = [f for f in files if allowed_file(f)]
-        logger.info(f"Найдено файлов в uploaded: {len(files)}, из них изображений: {len(image_files)}")
-        for filename in image_files:
-            file_path = os.path.join(path_manager.uploaded_dir, filename)
-            logger.info(f"Добавление файла: {filename}")
+        # Используем os.scandir для более эффективного сканирования
+        with os.scandir(path_manager.uploaded_dir) as entries:
+            # Фильтруем только файлы с разрешенными расширениями
+            image_files = [entry for entry in entries if entry.is_file() and allowed_file(entry.name)]
+            logger.info(f"Найдено изображений в uploaded: {len(image_files)}")
 
-            # Check if metadata exists
-            metadata_path = os.path.join(path_manager.uploaded_dir, os.path.splitext(filename)[0] + '.json')
-            metadata = None
-            if os.path.exists(metadata_path):
-                try:
-                    with open(metadata_path, 'r', encoding='utf-8') as f:
-                        metadata = json.load(f)
-                except Exception as e:
-                    logger.error(f"Error loading metadata for {filename}: {str(e)}")
+            for entry in image_files:
+                stat_info = entry.stat()
+                logger.debug(f"Добавление файла: {entry.name}")
 
-            uploaded.append({
-                'name': filename,
-                'path': file_path,
-                'metadata_path': metadata_path if os.path.exists(metadata_path) else None,
-                'metadata': metadata,
-                'size': os.path.getsize(file_path),
-                'modified': datetime.fromtimestamp(os.path.getmtime(file_path))
-            })
+                # Check if metadata exists
+                metadata_path = os.path.join(path_manager.uploaded_dir, os.path.splitext(entry.name)[0] + '.json')
+                metadata = None
+                if os.path.exists(metadata_path):
+                    try:
+                        with open(metadata_path, 'r', encoding='utf-8') as f:
+                            metadata = json.load(f)
+                    except Exception as e:
+                        logger.error(f"Error loading metadata for {entry.name}: {str(e)}")
+
+                uploaded.append({
+                    'name': entry.name,
+                    'path': entry.path,
+                    'metadata_path': metadata_path if os.path.exists(metadata_path) else None,
+                    'metadata': metadata,
+                    'size': stat_info.st_size,
+                    'modified': datetime.fromtimestamp(stat_info.st_mtime)
+                })
     except Exception as e:
         logger.error(f"Ошибка при сканировании директории uploaded: {str(e)}")
 

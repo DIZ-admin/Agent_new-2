@@ -24,13 +24,17 @@ def index():
     """Render the logs page."""
     config = get_config()
     logs_dir = config.logs_dir
-    
+
     # Get all log files
     log_files = []
     for filename in os.listdir(logs_dir):
         if filename.endswith('.log'):
             file_path = os.path.join(logs_dir, filename)
-            
+
+            # Skip symbolic links
+            if os.path.islink(file_path):
+                continue
+
             # Extract date from filename
             date_match = re.search(r'(\d{4}-\d{2}-\d{2})', filename)
             log_date = None
@@ -39,7 +43,7 @@ def index():
                     log_date = datetime.strptime(date_match.group(1), '%Y-%m-%d')
                 except ValueError:
                     pass
-            
+
             log_files.append({
                 'name': filename,
                 'path': file_path,
@@ -47,26 +51,26 @@ def index():
                 'modified': datetime.fromtimestamp(os.path.getmtime(file_path)),
                 'date': log_date
             })
-    
+
     # Sort by date (newest first)
     log_files.sort(key=lambda x: x['modified'], reverse=True)
-    
+
     # Get selected log file
     selected_log = request.args.get('file')
     if selected_log and selected_log in [log['name'] for log in log_files]:
         selected_path = os.path.join(logs_dir, selected_log)
-        
+
         # Read log file content
         try:
             with open(selected_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            
+
             # Parse log entries
             log_entries = []
             for line in content.split('\n'):
                 if not line.strip():
                     continue
-                
+
                 # Try to parse log entry
                 try:
                     # Format: 2023-04-10 14:25:33,123 - module - LEVEL - Message
@@ -77,7 +81,7 @@ def index():
                             timestamp = datetime.strptime(timestamp_str.strip(), '%Y-%m-%d %H:%M:%S,%f')
                         except ValueError:
                             timestamp = None
-                        
+
                         log_entries.append({
                             'timestamp': timestamp,
                             'module': module.strip(),
@@ -107,8 +111,8 @@ def index():
     else:
         selected_log = None
         log_entries = []
-    
-    return render_template('logs/index.html', 
+
+    return render_template('logs/index.html',
                           log_files=log_files,
                           selected_log=selected_log,
                           log_entries=log_entries)
@@ -118,7 +122,7 @@ def download_log(filename):
     """Download a log file."""
     config = get_config()
     logs_dir = config.logs_dir
-    
+
     file_path = os.path.join(logs_dir, filename)
     if os.path.exists(file_path) and filename.endswith('.log'):
         return send_file(file_path, as_attachment=True)
@@ -137,5 +141,5 @@ def rotate():
     except Exception as e:
         flash(f"Error rotating logs: {str(e)}", "danger")
         logger.error(f"Error rotating logs: {str(e)}")
-    
+
     return redirect(url_for('logs.index'))
