@@ -21,16 +21,33 @@ def index():
     # Get process tracker
     process_tracker = get_process_tracker()
 
-    # Get all processes
-    processes = process_tracker.get_all_processes()
+    # Добавляем логирование
+    logger.info("Запрос на отображение страницы с процессами")
 
-    # Format processes for display
-    formatted_processes = {}
-    for pid, process_info in processes.items():
-        formatted_processes[pid] = process_tracker.format_process_info(process_info)
+    try:
+        # Get all processes
+        processes = process_tracker.get_all_processes()
+        logger.info(f"Получено процессов: {len(processes)}")
 
-    return render_template('processes/index.html',
-                          processes=formatted_processes)
+        # Format processes for display
+        formatted_processes = {}
+        for pid, process_info in processes.items():
+            try:
+                formatted_process = process_tracker.format_process_info(process_info)
+                if formatted_process:
+                    formatted_processes[pid] = formatted_process
+                    logger.debug(f"Отформатирован процесс: PID={pid}, name={process_info.get('name')}")
+            except Exception as e:
+                logger.error(f"Ошибка при форматировании процесса: PID={pid}, error={str(e)}")
+
+        logger.info(f"Отформатировано процессов: {len(formatted_processes)}")
+        return render_template('processes/index.html',
+                            processes=formatted_processes)
+    except Exception as e:
+        logger.error(f"Ошибка при получении процессов: {str(e)}")
+        flash(f"Ошибка при получении процессов: {str(e)}", "danger")
+        return render_template('processes/index.html',
+                            processes={})
 
 @bp.route('/<pid>')
 def view_process(pid):

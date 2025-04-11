@@ -1,54 +1,15 @@
 {
-    "16": {
-        "pid": 16,
-        "name": "metadata_schema",
-        "start_time": 1744324508.9480581,
-        "status": "running",
-        "details": {
-            "module": "src.metadata_schema",
-            "started_by": "web",
-            "progress": 0,
-            "progress_message": "Starting process..."
-        },
-        "last_updated": 1744324508.9480882
-    },
-    "53": {
-        "pid": 53,
-        "name": "openai_analyzer",
-        "start_time": 1744324855.8652582,
-        "status": "running",
-        "details": {
-            "module": "src.openai_analyzer",
-            "started_by": "web",
-            "progress": 0,
-            "progress_message": "Starting process..."
-        },
-        "last_updated": 1744324855.865339
-    },
-    "59": {
-        "pid": 59,
-        "name": "openai_analyzer",
-        "start_time": 1744324953.5389614,
-        "status": "running",
-        "details": {
-            "module": "src.openai_analyzer",
-            "started_by": "web",
-            "progress": 0,
-            "progress_message": "Starting process..."
-        },
-        "last_updated": 1744324953.53899
-    },
-    "62": {
-        "pid": 62,
+    "29": {
+        "pid": 29,
         "name": "auto_process",
-        "start_time": 1744324966.2143,
-        "status": "running",
+        "start_time": 1744358160.553547,
+        "status": "finished",
         "details": {
             "module": "src.auto_process",
             "started_by": "web",
-            "progress": 0,
-            "progress_message": "Starting process..."
+            "progress": 100,
+            "progress_message": "All scripts completed successfully"
         },
-        "last_updated": 1744324966.2143295
+        "last_updated": 1744358303.6775835
     }
 }

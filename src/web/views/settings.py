@@ -24,7 +24,7 @@ def index():
     """Render the settings page."""
     config = get_config()
     path_manager = get_path_manager()
-    
+
     # Load SharePoint schema
     schema_path = path_manager.get_schema_path()
     schema = None
@@ -34,7 +34,7 @@ def index():
                 schema = json.load(f)
         except Exception as e:
             logger.error(f"Error loading schema: {str(e)}")
-    
+
     # Get environment variables
     env_vars = {
         'SHAREPOINT_SITE_URL': os.environ.get('SHAREPOINT_SITE_URL', ''),
@@ -48,8 +48,8 @@ def index():
         'LOG_LEVEL': os.environ.get('LOG_LEVEL', ''),
         'LOG_FILE': os.environ.get('LOG_FILE', '')
     }
-    
-    return render_template('settings/index.html', 
+
+    return render_template('settings/index.html',
                           config=config,
                           schema=schema,
                           env_vars=env_vars)
@@ -59,7 +59,7 @@ def update_env():
     """Update environment variables."""
     # This is a simplified version - in a real application, you would want to validate
     # and sanitize the input, and possibly use a more secure method to store credentials
-    
+
     # Get form data
     env_vars = {
         'SHAREPOINT_SITE_URL': request.form.get('SHAREPOINT_SITE_URL', ''),
@@ -71,23 +71,23 @@ def update_env():
         'LOG_LEVEL': request.form.get('LOG_LEVEL', ''),
         'LOG_FILE': request.form.get('LOG_FILE', '')
     }
-    
+
     # Update password and API key only if provided
     if request.form.get('SHAREPOINT_PASSWORD'):
         env_vars['SHAREPOINT_PASSWORD'] = request.form.get('SHAREPOINT_PASSWORD')
-    
+
     if request.form.get('OPENAI_API_KEY'):
         env_vars['OPENAI_API_KEY'] = request.form.get('OPENAI_API_KEY')
-    
+
     # Update environment variables in config.env
     try:
         config_dir = get_config().config_dir
         env_path = os.path.join(config_dir, 'config.env')
-        
+
         # Read existing file
         with open(env_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
-        
+
         # Update values
         new_lines = []
         for line in lines:
@@ -95,58 +95,61 @@ def update_env():
             if not line or line.startswith('#'):
                 new_lines.append(line)
                 continue
-            
+
             key, value = line.split('=', 1)
             key = key.strip()
-            
+
             if key in env_vars and env_vars[key]:
                 new_lines.append(f"{key}={env_vars[key]}")
             else:
                 new_lines.append(line)
-        
+
         # Write back to file
         with open(env_path, 'w', encoding='utf-8') as f:
             f.write('\n'.join(new_lines))
-        
+
         flash("Settings updated successfully. Restart the application for changes to take effect.", "success")
         logger.info("Environment variables updated via web interface")
     except Exception as e:
         flash(f"Error updating settings: {str(e)}", "danger")
         logger.error(f"Error updating environment variables: {str(e)}")
-    
+
     return redirect(url_for('settings.index'))
 
 @bp.route('/clean_directory/<directory>')
 def clean_directory(directory):
     """Clean a directory."""
     path_manager = get_path_manager()
-    
+
     valid_directories = {
         'downloads': path_manager.downloads_dir,
         'metadata': path_manager.metadata_dir,
         'analysis': path_manager.analysis_dir,
         'upload': path_manager.upload_dir,
-        'upload_metadata': path_manager.upload_metadata_dir
+        'upload_metadata': path_manager.upload_metadata_dir,
+        'uploaded': path_manager.uploaded_dir,
+        'processed': path_manager.processed_dir,
+        'reports': path_manager.reports_dir
     }
-    
+
     if directory not in valid_directories:
         flash(f"Invalid directory: {directory}", "danger")
         return redirect(url_for('settings.index'))
-    
+
     try:
         dir_path = valid_directories[directory]
         count = 0
-        
+
         for filename in os.listdir(dir_path):
             file_path = os.path.join(dir_path, filename)
             if os.path.isfile(file_path):
                 os.remove(file_path)
                 count += 1
-        
+
         flash(f"Successfully cleaned {count} files from {directory} directory", "success")
         logger.info(f"Cleaned {count} files from {directory} directory via web interface")
     except Exception as e:
         flash(f"Error cleaning {directory} directory: {str(e)}", "danger")
         logger.error(f"Error cleaning {directory} directory: {str(e)}")
-    
+
     return redirect(url_for('settings.index'))

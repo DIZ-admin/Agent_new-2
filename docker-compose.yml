@@ -9,7 +9,7 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./config:/app/config
-    restart: unless-stopped
+    restart: "no"
     environment:
       - TZ=Europe/Berlin
       - PYTHONUNBUFFERED=1
@@ -41,5 +41,5 @@ services:
       - FLASK_APP=src.web_server
       - FLASK_ENV=development
     ports:
-      - "5000:5000"
+      - "5001:5000"
     command: python -m src.web_server

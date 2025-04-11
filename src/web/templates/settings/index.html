@@ -116,6 +116,24 @@
                         </div>
                         <small>Delete all files in the upload metadata directory.</small>
                     </a>
+                    <a href="{{ url_for('settings.clean_directory', directory='uploaded') }}" class="list-group-item list-group-item-action" onclick="return confirm('Are you sure you want to clean the uploaded directory?');">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1"><i class="fas fa-cloud-upload-alt"></i> Clean Uploaded Directory</h6>
+                        </div>
+                        <small>Delete all files in the uploaded directory.</small>
+                    </a>
+                    <a href="{{ url_for('settings.clean_directory', directory='processed') }}" class="list-group-item list-group-item-action" onclick="return confirm('Are you sure you want to clean the processed directory?');">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1"><i class="fas fa-cogs"></i> Clean Processed Directory</h6>
+                        </div>
+                        <small>Delete all files in the processed directory.</small>
+                    </a>
+                    <a href="{{ url_for('settings.clean_directory', directory='reports') }}" class="list-group-item list-group-item-action" onclick="return confirm('Are you sure you want to clean the reports directory?');">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1"><i class="fas fa-file-alt"></i> Clean Reports Directory</h6>
+                        </div>
+                        <small>Delete all files in the reports directory.</small>
+                    </a>
                 </div>
             </div>
         </div>
