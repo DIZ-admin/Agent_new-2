@@ -40,22 +40,22 @@
     <div class="col-md-12">
         <ul class="nav nav-tabs" id="photoTabs" role="tablist">
             <li class="nav-item">
-                <a class="nav-link {% if active_tab == 'downloads' %}active{% endif %}" id="downloads-tab" data-toggle="tab" href="#downloads" role="tab" aria-controls="downloads" aria-selected="{{ 'true' if active_tab == 'downloads' else 'false' }}">
+                <a class="nav-link {% if active_tab == 'downloads' %}active{% endif %}" id="downloads-tab" href="{{ url_for('photos.index', tab='downloads') }}">
                     <i class="fas fa-download"></i> Downloads ({{ downloads|length }})
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link {% if active_tab == 'analyzed' %}active{% endif %}" id="analyzed-tab" data-toggle="tab" href="#analyzed" role="tab" aria-controls="analyzed" aria-selected="{{ 'true' if active_tab == 'analyzed' else 'false' }}">
+                <a class="nav-link {% if active_tab == 'analyzed' %}active{% endif %}" id="analyzed-tab" href="{{ url_for('photos.index', tab='analyzed') }}">
                     <i class="fas fa-brain"></i> Analyzed ({{ analyzed|length }})
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link {% if active_tab == 'upload_ready' %}active{% endif %}" id="upload-ready-tab" data-toggle="tab" href="#upload-ready" role="tab" aria-controls="upload-ready" aria-selected="{{ 'true' if active_tab == 'upload_ready' else 'false' }}">
+                <a class="nav-link {% if active_tab == 'upload_ready' %}active{% endif %}" id="upload-ready-tab" href="{{ url_for('photos.index', tab='upload_ready') }}">
                     <i class="fas fa-upload"></i> Ready for Upload ({{ upload_ready|length }})
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link {% if active_tab == 'uploaded' %}active{% endif %}" id="uploaded-tab" data-toggle="tab" href="#uploaded" role="tab" aria-controls="uploaded" aria-selected="{{ 'true' if active_tab == 'uploaded' else 'false' }}">
+                <a class="nav-link {% if active_tab == 'uploaded' %}active{% endif %}" id="uploaded-tab" href="{{ url_for('photos.index', tab='uploaded') }}">
                     <i class="fas fa-cloud-upload-alt"></i> Uploaded ({{ uploaded|length }})
                 </a>
             </li>
@@ -125,9 +125,9 @@
                                     {% for photo in current_items %}
                                     <tr>
                                         <td>
-                                            {% if photo.original_path %}
-                                            <a href="{{ photo.original_path }}" target="_blank">
-                                                <img src="{{ photo.original_path }}" class="photo-thumbnail" alt="{{ photo.name }}">
+                                            {% if photo.original_filename %}
+                                            <a href="{{ url_for('photos.view_photo', filename=photo.original_filename) }}" target="_blank">
+                                                <img src="{{ url_for('photos.view_photo', filename=photo.original_filename) }}" class="photo-thumbnail" alt="{{ photo.name }}" onerror="this.onerror=null; this.src='/static/img/no-image.png'; this.alt='Image not available';">
                                             </a>
                                             {% else %}
                                             <div class="photo-thumbnail bg-light d-flex align-items-center justify-content-center">
@@ -230,6 +230,11 @@
                                             <a href="{{ url_for('photos.view_photo', filename=photo.name) }}" class="btn btn-sm btn-outline-primary" target="_blank">
                                                 <i class="fas fa-eye"></i> View
                                             </a>
+                                            {% if photo.metadata_path %}
+                                            <a href="{{ url_for('photos.view_analysis', filename=photo.name) }}" class="btn btn-sm btn-outline-info">
+                                                <i class="fas fa-search"></i> View Metadata
+                                            </a>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                     {% endfor %}
