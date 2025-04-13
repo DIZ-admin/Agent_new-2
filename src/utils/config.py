@@ -50,6 +50,8 @@ class LoggingConfig:
     """Configuration for logging."""
     log_level: str
     log_file: str
+    mode: str  # 'development' or 'production'
+    verbose_dirs: bool  # Whether to log directory contents
 
 
 @dataclass
@@ -163,7 +165,9 @@ def load_config() -> AppConfig:
 
     logging_config = LoggingConfig(
         log_level=os.getenv("LOG_LEVEL", "INFO"),
-        log_file=os.getenv("LOG_FILE", "sharepoint_connector.log")
+        log_file=os.getenv("LOG_FILE", "sharepoint_connector.log"),
+        mode=os.getenv("LOG_MODE", "development"),
+        verbose_dirs=os.getenv("LOG_VERBOSE_DIRS", "true").lower() == "true"
     )
 
     # Create and return the main configuration

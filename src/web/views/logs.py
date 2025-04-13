@@ -104,6 +104,9 @@ def index():
                         'level': None,
                         'message': line
                     })
+
+            # Reverse the order of log entries to show newest first
+            log_entries.reverse()
         except Exception as e:
             flash(f"Error reading log file: {str(e)}", "danger")
             logger.error(f"Error reading log file {selected_log}: {str(e)}")

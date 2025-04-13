@@ -56,11 +56,24 @@ def get_logger(name: str) -> logging.Logger:
 
         # Create file handler
         file_handler = logging.FileHandler(log_file_path)
+
+        # Set different log levels based on mode
+        if config.logging.mode == 'production':
+            # In production mode, only log WARNING and above to file
+            file_handler.setLevel(logging.WARNING)
+        else:
+            # In development mode, use the configured log level
+            file_handler.setLevel(log_level)
+
         file_handler.setFormatter(detailed_formatter)
 
         # Create console handler
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(simple_formatter)
+
+        # In production mode, only show INFO and above in console
+        if config.logging.mode == 'production':
+            console_handler.setLevel(logging.INFO)
 
         # Add handlers to logger
         logger.addHandler(file_handler)
@@ -298,6 +311,59 @@ class ProgressLogger:
         self.logger.info(message)
 
 
+def should_log_verbose(logger_name: str = None) -> bool:
+    """
+    Check if verbose logging is enabled based on configuration.
+
+    Args:
+        logger_name (str, optional): Logger name to check specific loggers
+
+    Returns:
+        bool: True if verbose logging is enabled
+    """
+    config = get_config()
+
+    # In production mode, don't log verbose messages
+    if config.logging.mode == 'production':
+        return False
+
+    # Check if verbose directory logging is enabled
+    if not config.logging.verbose_dirs:
+        return False
+
+    # Could add specific logger checks here if needed
+    # if logger_name and logger_name.startswith('web.'):
+    #    return False
+
+    return True
+
+
+def log_directory_contents(logger, dir_path, dir_name, max_files=5):
+    """
+    Log directory contents if verbose logging is enabled.
+
+    Args:
+        logger (logging.Logger): Logger to use
+        dir_path (str or Path): Directory path
+        dir_name (str): Directory name for logging
+        max_files (int): Maximum number of files to log
+    """
+    if not should_log_verbose(logger.name):
+        return
+
+    if not os.path.exists(dir_path):
+        logger.warning(f"Directory {dir_name} does not exist: {dir_path}")
+        return
+
+    logger.debug(f"Directory {dir_name} exists: {dir_path}")
+
+    try:
+        files = os.listdir(dir_path)[:max_files]
+        logger.debug(f"Files in {dir_name} (first {max_files}): {files}")
+    except Exception as e:
+        logger.warning(f"Error listing files in {dir_name}: {str(e)}")
+
+
 # For direct testing
 if __name__ == "__main__":
     # Test basic logger
@@ -330,3 +396,6 @@ if __name__ == "__main__":
         error_function()
     except ValueError:
         print("Error caught as expected")
+
+    # Test conditional logging
+    print(f"Verbose logging enabled: {should_log_verbose()}")

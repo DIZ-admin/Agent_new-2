@@ -96,12 +96,15 @@
 </div>
 {% endblock %}
 
+{% block scripts %}
 <script>
     $(document).ready(function() {
-        // Scroll to bottom of log container
+        // Logs are now displayed in reverse order (newest first),
+        // so we scroll to the top instead of the bottom
         var logContainer = $('.log-container');
         if (logContainer.length) {
-            logContainer.scrollTop(logContainer[0].scrollHeight);
+            logContainer.scrollTop(0);
         }
     });
 </script>
+{% endblock %}

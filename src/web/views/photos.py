@@ -11,7 +11,7 @@ from werkzeug.utils import secure_filename
 from datetime import datetime
 
 from src.utils.config import get_config
-from src.utils.logging import get_logger
+from src.utils.logging import get_logger, should_log_verbose, log_directory_contents
 from src.utils.paths import get_path_manager
 from src.utils.registry import get_registry
 
@@ -28,7 +28,7 @@ def allowed_file(filename):
 
 def validate_image_content(file):
     """Validate that the file is actually an image by checking its content.
-    
+
     Improved validation with more strict checks for file signatures.
 
     Args:
@@ -89,6 +89,8 @@ def index(tab=None):
     # Добавляем логирование
     logger.info(f"Запрос на отображение страницы с фотографиями, tab={tab}")
 
+    # Используем условное логирование для подробной информации
+
     # Determine active tab
     active_tab = tab or request.args.get('tab', 'downloads')
     if active_tab not in ['downloads', 'analyzed', 'upload_ready', 'uploaded']:
@@ -102,18 +104,19 @@ def index(tab=None):
         page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 12, type=int)  # Default 12 items per page
 
-    logger.info(f"Активная вкладка: {active_tab}, страница: {page}, элементов на странице: {per_page}")
+    logger.debug(f"Активная вкладка: {active_tab}, страница: {page}, элементов на странице: {per_page}")
 
     # Get photos from different directories
     downloads = []
-    logger.info(f"Сканирование директории downloads: {path_manager.downloads_dir}")
+    if should_log_verbose(logger.name):
+        logger.debug(f"Сканирование директории downloads: {path_manager.downloads_dir}")
     try:
         # Используем os.scandir вместо os.listdir для более эффективного сканирования
         with os.scandir(path_manager.downloads_dir) as entries:
             # Фильтруем только файлы с разрешенными расширениями
             image_files = [entry for entry in entries if entry.is_file() and allowed_file(entry.name)]
 
-            logger.info(f"Найдено изображений в downloads: {len(image_files)}")
+            logger.debug(f"Найдено изображений в downloads: {len(image_files)}")
 
             # Создаем список файлов с минимальным количеством системных вызовов
             for entry in image_files:
@@ -130,13 +133,14 @@ def index(tab=None):
         logger.error(f"Ошибка при сканировании директории downloads: {str(e)}")
 
     analyzed = []
-    logger.info(f"Сканирование директории analysis: {path_manager.analysis_dir}")
+    if should_log_verbose(logger.name):
+        logger.debug(f"Сканирование директории analysis: {path_manager.analysis_dir}")
     try:
         # Используем os.scandir для более эффективного сканирования
         with os.scandir(path_manager.analysis_dir) as entries:
             # Фильтруем только файлы с расширением .json
             json_files = [entry for entry in entries if entry.is_file() and entry.name.endswith('.json')]
-            logger.info(f"Найдено JSON файлов в analysis: {len(json_files)}")
+            logger.debug(f"Найдено JSON файлов в analysis: {len(json_files)}")
 
             for entry in json_files:
                 stat_info = entry.stat()
@@ -215,13 +219,14 @@ def index(tab=None):
         logger.error(f"Ошибка при сканировании директории analysis: {str(e)}")
 
     upload_ready = []
-    logger.info(f"Сканирование директории upload: {path_manager.upload_dir}")
+    if should_log_verbose(logger.name):
+        logger.debug(f"Сканирование директории upload: {path_manager.upload_dir}")
     try:
         # Используем os.scandir для более эффективного сканирования
         with os.scandir(path_manager.upload_dir) as entries:
             # Фильтруем только файлы с разрешенными расширениями
             image_files = [entry for entry in entries if entry.is_file() and allowed_file(entry.name)]
-            logger.info(f"Найдено изображений в upload: {len(image_files)}")
+            logger.debug(f"Найдено изображений в upload: {len(image_files)}")
 
             for entry in image_files:
                 stat_info = entry.stat()
@@ -249,13 +254,14 @@ def index(tab=None):
         logger.error(f"Ошибка при сканировании директории upload: {str(e)}")
 
     uploaded = []
-    logger.info(f"Сканирование директории uploaded: {path_manager.uploaded_dir}")
+    if should_log_verbose(logger.name):
+        logger.debug(f"Сканирование директории uploaded: {path_manager.uploaded_dir}")
     try:
         # Используем os.scandir для более эффективного сканирования
         with os.scandir(path_manager.uploaded_dir) as entries:
             # Фильтруем только файлы с разрешенными расширениями
             image_files = [entry for entry in entries if entry.is_file() and allowed_file(entry.name)]
-            logger.info(f"Найдено изображений в uploaded: {len(image_files)}")
+            logger.debug(f"Найдено изображений в uploaded: {len(image_files)}")
 
             for entry in image_files:
                 stat_info = entry.stat()
@@ -384,50 +390,51 @@ def view_photo(filename):
 
     # Логируем запрос для отладки
     logger.info(f"Запрос на просмотр фото: {filename}")
-    logger.info(f"Пути поиска: downloads_dir={path_manager.downloads_dir}, analysis_dir={path_manager.analysis_dir}, upload_dir={path_manager.upload_dir}, uploaded_dir={path_manager.uploaded_dir}")
 
-    # Проверяем существование директорий
-    for dir_name, dir_path in {
+    # Используем условное логирование для подробной информации
+    from src.utils.logging import should_log_verbose, log_directory_contents
+
+    if should_log_verbose(logger.name):
+        logger.debug(f"Пути поиска: downloads_dir={path_manager.downloads_dir}, analysis_dir={path_manager.analysis_dir}, upload_dir={path_manager.upload_dir}, uploaded_dir={path_manager.uploaded_dir}")
+
+        # Проверяем существование директорий и логируем их содержимое
+        for dir_name, dir_path in {
+            'downloads_dir': path_manager.downloads_dir,
+            'analysis_dir': path_manager.analysis_dir,
+            'upload_dir': path_manager.upload_dir,
+            'uploaded_dir': path_manager.uploaded_dir,
+            'processed_dir': path_manager.processed_dir
+        }.items():
+            log_directory_contents(logger, dir_path, dir_name)
+
+    # Determine which directory the file is in
+    # Проверяем наличие файла в разных директориях
+    directories = {
         'downloads_dir': path_manager.downloads_dir,
         'analysis_dir': path_manager.analysis_dir,
         'upload_dir': path_manager.upload_dir,
         'uploaded_dir': path_manager.uploaded_dir,
         'processed_dir': path_manager.processed_dir
-    }.items():
-        if not os.path.exists(dir_path):
-            logger.warning(f"Директория {dir_name} не существует: {dir_path}")
-        else:
-            logger.info(f"Директория {dir_name} существует: {dir_path}")
-            # Выводим список файлов в директории (только первые 5 для краткости)
-            files = os.listdir(dir_path)[:5]
-            logger.info(f"Файлы в {dir_name} (первые 5): {files}")
+    }
 
-    # Determine which directory the file is in
-    if os.path.exists(os.path.join(path_manager.downloads_dir, filename)):
-        logger.info(f"Фото найдено в downloads_dir: {filename}")
-        return send_from_directory(path_manager.downloads_dir, filename)
-    elif os.path.exists(os.path.join(path_manager.analysis_dir, filename)):
-        logger.info(f"Фото найдено в analysis_dir: {filename}")
-        return send_from_directory(path_manager.analysis_dir, filename)
-    elif os.path.exists(os.path.join(path_manager.upload_dir, filename)):
-        logger.info(f"Фото найдено в upload_dir: {filename}")
-        return send_from_directory(path_manager.upload_dir, filename)
-    elif os.path.exists(os.path.join(path_manager.uploaded_dir, filename)):
-        logger.info(f"Фото найдено в uploaded_dir: {filename}")
-        return send_from_directory(path_manager.uploaded_dir, filename)
-    elif os.path.exists(os.path.join(path_manager.processed_dir, filename)):
-        logger.info(f"Фото найдено в processed_dir: {filename}")
-        return send_from_directory(path_manager.processed_dir, filename)
-    else:
-        logger.warning(f"Фото не найдено: {filename}")
-        flash(f"File not found: {filename}", "danger")
-        return redirect(url_for('photos.index'))
+    for dir_name, dir_path in directories.items():
+        file_path = os.path.join(dir_path, filename)
+        if os.path.exists(file_path):
+            logger.info(f"Фото найдено в {dir_name}: {filename}")
+            return send_from_directory(dir_path, filename)
+
+    # Если файл не найден
+    logger.warning(f"Фото не найдено: {filename}")
+    flash(f"File not found: {filename}", "danger")
+    return redirect(url_for('photos.index'))
 
 @bp.route('/analysis/<path:filename>')
 def view_analysis(filename):
     """View analysis for a photo."""
     path_manager = get_path_manager()
     logger.info(f"Запрос на просмотр анализа для файла: {filename}")
+
+    # Используем условное логирование для подробной информации
 
     # Сначала проверяем, есть ли файл анализа в директории analysis
     analysis_path = os.path.join(path_manager.analysis_dir, filename)
@@ -443,7 +450,7 @@ def view_analysis(filename):
         try:
             with open(analysis_path, 'r', encoding='utf-8') as f:
                 analysis = json.load(f)
-            logger.info(f"Загружен файл анализа из директории analysis: {analysis_path}")
+            logger.debug(f"Загружен файл анализа из директории analysis: {analysis_path}")
         except Exception as e:
             logger.error(f"Ошибка при загрузке файла анализа из директории analysis: {str(e)}")
 
@@ -455,7 +462,7 @@ def view_analysis(filename):
             try:
                 with open(uploaded_json_path, 'r', encoding='utf-8') as f:
                     analysis = json.load(f)
-                logger.info(f"Загружен файл метаданных из директории uploaded: {uploaded_json_path}")
+                logger.debug(f"Загружен файл метаданных из директории uploaded: {uploaded_json_path}")
             except Exception as e:
                 logger.error(f"Ошибка при загрузке файла метаданных из директории uploaded: {str(e)}")
 
@@ -467,7 +474,7 @@ def view_analysis(filename):
                 photo_path = os.path.join(dir_path, photo_name + ext)
                 if os.path.exists(photo_path):
                     original_path = url_for('photos.view_photo', filename=photo_name + ext)
-                    logger.info(f"Найдено оригинальное фото: {photo_path}")
+                    logger.debug(f"Найдено оригинальное фото: {photo_path}")
                     break
             if original_path:
                 break
