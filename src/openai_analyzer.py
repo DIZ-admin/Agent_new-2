@@ -35,6 +35,39 @@ openai.api_key = config.openai.api_key
 OPENAI_CONCURRENCY_LIMIT = config.openai.concurrency_limit
 MAX_TOKENS = config.openai.max_tokens
 
+# Get model parameters from environment or config
+def get_model_params():
+    """Get model parameters from environment or config."""
+    # Get current config
+    current_config = get_config()
+
+    # Get model name
+    model_name = os.environ.get('MODEL_NAME', '')
+    if not model_name:
+        model_name = getattr(current_config.openai, 'model_name', 'gpt-4-vision-preview')
+
+    # Get temperature
+    temperature_str = os.environ.get('TEMPERATURE', '')
+    try:
+        temperature = float(temperature_str) if temperature_str else 0.5
+    except ValueError:
+        temperature = 0.5
+
+    # Get image detail level
+    image_detail = os.environ.get('IMAGE_DETAIL', '')
+    if not image_detail:
+        image_detail = getattr(current_config.openai, 'image_detail', 'high')
+
+    # Validate image detail
+    if image_detail not in ['auto', 'low', 'high']:
+        image_detail = 'high'
+
+    return {
+        'model_name': model_name,
+        'temperature': temperature,
+        'image_detail': image_detail
+    }
+
 # Metadata schema file
 METADATA_SCHEMA_FILE = config.file.metadata_schema_file
 
@@ -342,10 +375,12 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True, 
             # Encode image to base64
             base64_image = encode_image_to_base64(image_path)
 
+            # Get model parameters
+            model_params = get_model_params()
+
             # Create OpenAI API request
-            # Use GPT-4 Vision Preview for better image analysis
             response = openai.chat.completions.create(
-                model="gpt-4-vision-preview",  # Better model for image analysis
+                model=model_params['model_name'],
                 messages=[
                     {
                         "role": "system",
@@ -359,14 +394,14 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True, 
                                 "type": "image_url",
                                 "image_url": {
                                     "url": f"data:image/jpeg;base64,{base64_image}",
-                                    "detail": "high"  # Request high detail analysis
+                                    "detail": model_params['image_detail']
                                 }
                             }
                         ]
                     }
                 ],
                 max_tokens=MAX_TOKENS,
-                temperature=0.5  # Lower temperature for more precise responses
+                temperature=model_params['temperature']
             )
 
             # Extract and parse JSON response
