@@ -28,6 +28,8 @@ def allowed_file(filename):
 
 def validate_image_content(file):
     """Validate that the file is actually an image by checking its content.
+    
+    Improved validation with more strict checks for file signatures.
 
     Args:
         file: File object to validate
@@ -39,31 +41,39 @@ def validate_image_content(file):
         # Save the current position
         current_position = file.tell()
 
-        # Read the first few bytes to check the file signature
-        header = file.read(8)
+        # Read 32 bytes to allow for more thorough validation
+        header = file.read(32)
         file.seek(current_position)  # Reset file position
 
-        # Check common image signatures
-        # JPEG: starts with FF D8
-        if header.startswith(b'\xFF\xD8'):
+        # Enhanced checks for common image signatures
+        # JPEG: starts with FF D8 FF
+        if header.startswith(b'\xFF\xD8\xFF'):
             return True
-        # PNG: starts with 89 50 4E 47 0D 0A 1A 0A
-        elif header.startswith(b'\x89PNG\r\n\x1a\n'):
+        # PNG: starts with 89 50 4E 47 0D 0A 1A 0A and must contain IHDR
+        elif header.startswith(b'\x89PNG\r\n\x1a\n') and b'IHDR' in header[8:]:
             return True
-        # GIF: starts with GIF87a or GIF89a
-        elif header.startswith(b'GIF87a') or header.startswith(b'GIF89a'):
+        # GIF: starts with GIF87a or GIF89a and should contain a semicolon
+        elif (header.startswith(b'GIF87a') or header.startswith(b'GIF89a')) and b';' in header:
             return True
-        # BMP: starts with BM
-        elif header.startswith(b'BM'):
+        # BMP: starts with BM and must be at least 14 bytes (header size)
+        elif header.startswith(b'BM') and len(header) >= 14:
             return True
-        # TIFF: starts with II or MM
-        elif header.startswith(b'II') or header.startswith(b'MM'):
+        # TIFF: starts with II or MM followed by specific identification bytes
+        elif (header.startswith(b'II') and header[2:4] == b'\x2A\x00') or \
+             (header.startswith(b'MM') and header[2:4] == b'\x00\x2A'):
             return True
-        # WEBP: starts with RIFF and contains WEBP
-        elif header.startswith(b'RIFF') and b'WEBP' in file.read(16):
-            file.seek(current_position)  # Reset file position again
-            return True
+        # WEBP: starts with RIFF and contains WEBP and VP8/VP8L/VP8X
+        elif header.startswith(b'RIFF') and b'WEBP' in header:
+            vp_header = b'VP8' in header or b'VP8L' in header or b'VP8X' in header
+            if not vp_header:
+                # Read more to check for VP8 signatures
+                file.seek(current_position)
+                extended_header = file.read(64)
+                file.seek(current_position)
+                vp_header = b'VP8' in extended_header or b'VP8L' in extended_header or b'VP8X' in extended_header
+            return vp_header
 
+        logger.warning(f"File validation failed: Unrecognized image format")
         return False
     except Exception as e:
         logger.error(f"Error validating image content: {str(e)}")

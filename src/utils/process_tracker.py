@@ -219,19 +219,23 @@ class ProcessTracker:
                         to_remove.append(pid)
                         logger.info(f"Процесс не запущен и будет помечен как завершенный: PID={pid}, name={process_info.get('name')}")
 
-                        # Update status to "finished"
-                        self.processes[pid]["status"] = "finished"
-                        self.processes[pid]["last_updated"] = time.time()
+                        # Update status to "finished" only if it's not already finished, error or killed
+                        if self.processes[pid]["status"] not in ["finished", "error", "killed"]:
+                            self.processes[pid]["status"] = "finished"
+                            self.processes[pid]["last_updated"] = time.time()
+                            logger.info(f"Процесс завершен: PID={pid}, name={process_info.get('name')}")
                 except Exception as e:
                     to_remove.append(pid)
                     logger.error(f"Ошибка при проверке процесса: PID={pid}, error={str(e)}")
                     try:
-                        # Update status to "error"
-                        self.processes[pid]["status"] = "error"
-                        self.processes[pid]["last_updated"] = time.time()
-                        if "details" not in self.processes[pid]:
-                            self.processes[pid]["details"] = {}
-                        self.processes[pid]["details"]["error"] = str(e)
+                        # Update status to "error" only if it's not already finished, error or killed
+                        if self.processes[pid]["status"] not in ["finished", "error", "killed"]:
+                            self.processes[pid]["status"] = "error"
+                            self.processes[pid]["last_updated"] = time.time()
+                            if "details" not in self.processes[pid]:
+                                self.processes[pid]["details"] = {}
+                            self.processes[pid]["details"]["error"] = str(e)
+                            logger.info(f"Процесс завершен с ошибкой: PID={pid}, name={process_info.get('name')}")
                     except Exception as inner_e:
                         logger.error(f"Ошибка при обновлении статуса процесса: PID={pid}, error={str(inner_e)}")
 
@@ -318,10 +322,13 @@ class ProcessTracker:
             # If process is finished or has error, use last_updated as end time
             if process_info.get("status") in ["finished", "error", "killed"]:
                 end_time = process_info.get("last_updated", time.time())
+                # For completed processes, duration is fixed
+                duration = end_time - start_time
             else:
+                # For running processes, duration is calculated from current time
                 end_time = time.time()
+                duration = end_time - start_time
 
-            duration = end_time - start_time
             formatted_info["duration"] = self._format_duration(duration)
             formatted_info["duration_seconds"] = duration
 

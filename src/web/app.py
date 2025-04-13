@@ -7,6 +7,7 @@ This module provides the Flask application for the web interface.
 import os
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from datetime import datetime
+from flask_wtf.csrf import CSRFProtect
 
 from src.utils.config import get_config
 from src.utils.logging import get_logger, rotate_logs
@@ -14,6 +15,9 @@ from src.utils.paths import get_path_manager
 
 # Get logger
 logger = get_logger('web_interface')
+
+# Initialize CSRF protection
+csrf = CSRFProtect()
 
 def create_app(test_config=None):
     """
@@ -33,7 +37,8 @@ def create_app(test_config=None):
         MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # 16 MB max upload size
     )
 
-    # No Bootstrap initialization needed
+    # Initialize CSRF protection
+    csrf.init_app(app)
 
     if test_config is None:
         # Load the instance config, if it exists, when not testing

@@ -120,44 +120,49 @@ def get_openai_prompt_settings():
         'optimized': 'optimized_prompt.env'
     }
 
-    # If using a custom prompt file
-    if prompt_type in prompt_files:
-        prompt_file = prompt_files[prompt_type]
-        prompt_path = os.path.join('config', prompt_file)
+    # Add any additional prompt files from config directory
+    config_dir = get_config().config_dir
+    for filename in os.listdir(config_dir):
+        if filename.endswith('_prompt.env'):
+            prompt_type_name = filename.replace('_prompt.env', '')
+            if prompt_type_name not in prompt_files:
+                prompt_files[prompt_type_name] = filename
 
-        if os.path.exists(prompt_path):
-            logger.info(f"Loading prompt settings from {prompt_file}")
-            try:
-                # Load prompt settings from file
-                with open(prompt_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
+    # If prompt type not found, default to optimized
+    if prompt_type not in prompt_files:
+        prompt_type = 'optimized'
+        logger.warning(f"Prompt type '{prompt_type}' not found, defaulting to 'optimized'")
 
-                # Extract settings using regex
-                role_match = re.search(r'OPENAI_PROMPT_ROLE="(.+?)"', content, re.DOTALL)
-                instructions_pre_match = re.search(r'OPENAI_PROMPT_INSTRUCTIONS_PRE="(.+?)"', content, re.DOTALL)
-                instructions_post_match = re.search(r'OPENAI_PROMPT_INSTRUCTIONS_POST="(.+?)"', content, re.DOTALL)
-                example_match = re.search(r'OPENAI_PROMPT_EXAMPLE="(.+?)"', content, re.DOTALL)
+    # Get the prompt file path
+    prompt_file = prompt_files[prompt_type]
+    prompt_path = os.path.join(config_dir, prompt_file)
 
-                role = role_match.group(1) if role_match else ''
-                instructions_pre = instructions_pre_match.group(1) if instructions_pre_match else ''
-                instructions_post = instructions_post_match.group(1) if instructions_post_match else ''
-                example = example_match.group(1) if example_match else ''
+    if os.path.exists(prompt_path):
+        logger.info(f"Loading prompt settings from {prompt_file}")
+        try:
+            # Load prompt settings from file
+            with open(prompt_path, 'r', encoding='utf-8') as f:
+                content = f.read()
 
-                return role, instructions_pre, instructions_post, example
-            except Exception as e:
-                logger.error(f"Error loading prompt settings from {prompt_file}: {str(e)}")
-                logger.info("Falling back to default prompt settings")
+            # Extract settings using regex
+            role_match = re.search(r'OPENAI_PROMPT_ROLE="(.+?)"', content, re.DOTALL)
+            instructions_pre_match = re.search(r'OPENAI_PROMPT_INSTRUCTIONS_PRE="(.+?)"', content, re.DOTALL)
+            instructions_post_match = re.search(r'OPENAI_PROMPT_INSTRUCTIONS_POST="(.+?)"', content, re.DOTALL)
+            example_match = re.search(r'OPENAI_PROMPT_EXAMPLE="(.+?)"', content, re.DOTALL)
 
-    # Fall back to configuration
-    current_config = get_config()
+            role = role_match.group(1) if role_match else ''
+            instructions_pre = instructions_pre_match.group(1) if instructions_pre_match else ''
+            instructions_post = instructions_post_match.group(1) if instructions_post_match else ''
+            example = example_match.group(1) if example_match else ''
 
-    # Return the current prompt settings
-    return (
-        current_config.openai.prompt_role,
-        current_config.openai.prompt_instructions_pre,
-        current_config.openai.prompt_instructions_post,
-        current_config.openai.prompt_example
-    )
+            return role, instructions_pre, instructions_post, example
+        except Exception as e:
+            logger.error(f"Error loading prompt settings from {prompt_file}: {str(e)}")
+            logger.warning("Falling back to default prompt settings")
+
+    # Fall back to empty values if file not found or error occurred
+    logger.warning(f"Prompt file {prompt_file} not found or could not be loaded, using empty values")
+    return ('', '', '', '')
 
 # Get path manager for directories
 path_manager = get_path_manager()

@@ -49,7 +49,6 @@
                         <label for="OPENAI_CONCURRENCY_LIMIT">OpenAI Concurrency Limit</label>
                         <input type="number" class="form-control" id="OPENAI_CONCURRENCY_LIMIT" name="OPENAI_CONCURRENCY_LIMIT" value="{{ env_vars.OPENAI_CONCURRENCY_LIMIT }}">
                     </div>
-
                     <div class="form-group">
                         <label for="MAX_TOKENS">Max Tokens</label>
                         <input type="number" class="form-control" id="MAX_TOKENS" name="MAX_TOKENS" value="{{ env_vars.MAX_TOKENS }}">
@@ -76,205 +75,85 @@
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-md-8">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5><i class="fas fa-brain"></i> OpenAI Prompt Settings</h5>
-                    </div>
-                    <div class="card-body">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-brain"></i> OpenAI Prompt Settings</h5>
+            </div>
+            <div class="card-body">
                 <form action="{{ url_for('settings.update_openai_prompt') }}" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                     <div class="form-group">
-                        <label for="OPENAI_PROMPT_TYPE">Prompt Type</label>
+                        <label for="OPENAI_PROMPT_TYPE">Prompt Template</label>
                         <select class="form-control" id="OPENAI_PROMPT_TYPE" name="OPENAI_PROMPT_TYPE">
-                            <option value="default" {% if env_vars.OPENAI_PROMPT_TYPE == 'default' %}selected{% endif %}>Default (Standard Config)</option>
-                            <option value="minimal" {% if env_vars.OPENAI_PROMPT_TYPE == 'minimal' %}selected{% endif %}>Minimal (Simplest)</option>
-                            <option value="structured_simple" {% if env_vars.OPENAI_PROMPT_TYPE == 'structured_simple' %}selected{% endif %}>Structured Simple</option>
-                            <option value="accuracy_focused" {% if env_vars.OPENAI_PROMPT_TYPE == 'accuracy_focused' %}selected{% endif %}>Accuracy Focused</option>
-                            <option value="examples" {% if env_vars.OPENAI_PROMPT_TYPE == 'examples' %}selected{% endif %}>With Examples</option>
-                            <option value="step_by_step" {% if env_vars.OPENAI_PROMPT_TYPE == 'step_by_step' %}selected{% endif %}>Step by Step</option>
-                            <option value="optimized" {% if env_vars.OPENAI_PROMPT_TYPE == 'optimized' %}selected{% endif %}>Optimized (Advanced)</option>
+                            {% for prompt_type, prompt_file in prompt_files.items() %}
+                            <option value="{{ prompt_type }}" {% if env_vars.OPENAI_PROMPT_TYPE == prompt_type %}selected{% endif %}>{{ prompt_type|capitalize }}</option>
+                            {% endfor %}
                         </select>
-                        <small class="form-text text-muted">Select the prompt style for OpenAI image analysis.</small>
+                        <small class="form-text text-muted">Select a predefined prompt template from the config directory</small>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> The prompt settings are now loaded directly from template files in the config directory.
+                        Select a template from the dropdown above to use it for image analysis.
                     </div>
 
                     <div class="form-group">
-                        <label for="OPENAI_PROMPT_ROLE">Prompt Role</label>
-                        <textarea class="form-control" id="OPENAI_PROMPT_ROLE" name="OPENAI_PROMPT_ROLE" rows="3">{{ env_vars.OPENAI_PROMPT_ROLE }}</textarea>
-                        <small class="form-text text-muted">The role instruction for the AI (e.g., "Act as an expert in wooden construction...")</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="OPENAI_PROMPT_INSTRUCTIONS_PRE">Pre-Instructions</label>
-                        <textarea class="form-control" id="OPENAI_PROMPT_INSTRUCTIONS_PRE" name="OPENAI_PROMPT_INSTRUCTIONS_PRE" rows="6">{{ env_vars.OPENAI_PROMPT_INSTRUCTIONS_PRE }}</textarea>
-                        <small class="form-text text-muted">Instructions that appear before the field descriptions</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="OPENAI_PROMPT_INSTRUCTIONS_POST">Post-Instructions</label>
-                        <textarea class="form-control" id="OPENAI_PROMPT_INSTRUCTIONS_POST" name="OPENAI_PROMPT_INSTRUCTIONS_POST" rows="6">{{ env_vars.OPENAI_PROMPT_INSTRUCTIONS_POST }}</textarea>
-                        <small class="form-text text-muted">Instructions that appear after the field descriptions</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="OPENAI_PROMPT_EXAMPLE">Example Output</label>
-                        <textarea class="form-control" id="OPENAI_PROMPT_EXAMPLE" name="OPENAI_PROMPT_EXAMPLE" rows="6">{{ env_vars.OPENAI_PROMPT_EXAMPLE }}</textarea>
-                        <small class="form-text text-muted">Example of the expected output format</small>
+                        <label for="prompt_preview">Current Prompt Preview</label>
+                        <textarea class="form-control" id="prompt_preview" rows="10" readonly>{{ prompt_preview }}</textarea>
+                        <small class="form-text text-muted">Preview of the currently selected prompt template (read-only)</small>
                     </div>
 
                     <button type="submit" class="btn btn-primary">Save Prompt Settings</button>
                 </form>
-
-                <script>
-                    // Function to load prompt settings based on selected type
-                    console.log('Script loaded, looking for OPENAI_PROMPT_TYPE element');
-                    const promptTypeSelect = document.getElementById('OPENAI_PROMPT_TYPE');
-                    console.log('Found element:', promptTypeSelect);
-
-                    promptTypeSelect.addEventListener('change', function() {
-                        const promptType = this.value;
-
-                        // Show loading indicator
-                        const loadingMsg = document.createElement('div');
-                        loadingMsg.id = 'loading-prompt';
-                        loadingMsg.className = 'alert alert-info mt-3';
-                        loadingMsg.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading prompt settings...';
-                        this.parentNode.appendChild(loadingMsg);
-
-                        // Fetch prompt settings via AJAX
-                        console.log('Fetching prompt template for type:', promptType);
-                        fetch('/settings/get_prompt_template?type=' + promptType)
-                            .then(response => {
-                                console.log('Response status:', response.status);
-                                return response.json();
-                            })
-                            .then(data => {
-                                console.log('Received data:', data);
-                                if (data.success) {
-                                    // Update form fields with the loaded template
-                                    document.getElementById('OPENAI_PROMPT_ROLE').value = data.role || '';
-                                    document.getElementById('OPENAI_PROMPT_INSTRUCTIONS_PRE').value = data.instructions_pre || '';
-                                    document.getElementById('OPENAI_PROMPT_INSTRUCTIONS_POST').value = data.instructions_post || '';
-                                    document.getElementById('OPENAI_PROMPT_EXAMPLE').value = data.example || '';
-
-                                    // Show success message
-                                    const successMsg = document.createElement('div');
-                                    successMsg.className = 'alert alert-success mt-3';
-                                    successMsg.innerHTML = '<i class="fas fa-check-circle"></i> Prompt template loaded. You can now edit and save these settings.';
-                                    successMsg.style.opacity = '1';
-
-                                    // Replace loading message with success
-                                    const loadingElement = document.getElementById('loading-prompt');
-                                    if (loadingElement) {
-                                        loadingElement.parentNode.replaceChild(successMsg, loadingElement);
-
-                                        // Fade out success message after 3 seconds
-                                        setTimeout(() => {
-                                            let opacity = 1;
-                                            const fadeInterval = setInterval(() => {
-                                                if (opacity <= 0.1) {
-                                                    clearInterval(fadeInterval);
-                                                    successMsg.remove();
-                                                }
-                                                successMsg.style.opacity = opacity;
-                                                opacity -= 0.1;
-                                            }, 100);
-                                        }, 3000);
-                                    }
-                                } else {
-                                    // Show error message
-                                    const errorMsg = document.createElement('div');
-                                    errorMsg.className = 'alert alert-danger mt-3';
-                                    errorMsg.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + (data.error || 'Failed to load prompt template');
-
-                                    // Replace loading message with error
-                                    const loadingElement = document.getElementById('loading-prompt');
-                                    if (loadingElement) {
-                                        loadingElement.parentNode.replaceChild(errorMsg, loadingElement);
-
-                                        // Remove error after 5 seconds
-                                        setTimeout(() => errorMsg.remove(), 5000);
-                                    }
-                                }
-                            })
-                            .catch(error => {
-                                console.error('Error loading prompt template:', error);
-
-                                // Show error message
-                                const errorMsg = document.createElement('div');
-                                errorMsg.className = 'alert alert-danger mt-3';
-                                errorMsg.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error loading prompt template: ' + error.message;
-
-                                // Replace loading message with error
-                                const loadingElement = document.getElementById('loading-prompt');
-                                if (loadingElement) {
-                                    loadingElement.parentNode.replaceChild(errorMsg, loadingElement);
-
-                                    // Remove error after 10 seconds
-                                    setTimeout(() => errorMsg.remove(), 10000);
-                                }
-                            });
-
-                    });
-
-                    // Trigger change event on page load to load the current template
-                    document.addEventListener('DOMContentLoaded', function() {
-                        console.log('DOM loaded, triggering change event');
-                        const event = new Event('change');
-                        promptTypeSelect.dispatchEvent(event);
-                    });
-                </script>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5><i class="fas fa-sliders-h"></i> Model Parameters</h5>
-                    </div>
-                    <div class="card-body">
-                        <form action="{{ url_for('settings.update_model_params') }}" method="post">
-                            <div class="form-group">
-                                <label for="MODEL_NAME">Model</label>
-                                <select class="form-control" id="MODEL_NAME" name="MODEL_NAME">
-                                    <option value="gpt-4-vision-preview" {% if env_vars.MODEL_NAME == 'gpt-4-vision-preview' %}selected{% endif %}>GPT-4 Vision Preview</option>
-                                    <option value="gpt-4o" {% if env_vars.MODEL_NAME == 'gpt-4o' %}selected{% endif %}>GPT-4o</option>
-                                    <option value="gpt-4-turbo" {% if env_vars.MODEL_NAME == 'gpt-4-turbo' %}selected{% endif %}>GPT-4 Turbo</option>
-                                </select>
-                                <small class="form-text text-muted">Select the OpenAI model to use for image analysis.</small>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="MAX_TOKENS">Max Tokens</label>
-                                <input type="number" class="form-control" id="MODEL_MAX_TOKENS" name="MAX_TOKENS" value="{{ env_vars.MAX_TOKENS }}">
-                                <small class="form-text text-muted">Maximum number of tokens in the response.</small>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="TEMPERATURE">Temperature</label>
-                                <input type="number" step="0.1" min="0" max="2" class="form-control" id="TEMPERATURE" name="TEMPERATURE" value="{{ env_vars.TEMPERATURE|default(0.5) }}">
-                                <small class="form-text text-muted">Controls randomness (0-2). Lower values are more deterministic.</small>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="IMAGE_DETAIL">Image Detail Level</label>
-                                <select class="form-control" id="IMAGE_DETAIL" name="IMAGE_DETAIL">
-                                    <option value="auto" {% if env_vars.IMAGE_DETAIL == 'auto' %}selected{% endif %}>Auto</option>
-                                    <option value="low" {% if env_vars.IMAGE_DETAIL == 'low' %}selected{% endif %}>Low</option>
-                                    <option value="high" {% if env_vars.IMAGE_DETAIL == 'high' %}selected{% endif %}>High</option>
-                                </select>
-                                <small class="form-text text-muted">Detail level for image analysis. Higher detail costs more tokens.</small>
-                            </div>
-
-                            <button type="submit" class="btn btn-primary">Save Model Parameters</button>
-                        </form>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
     <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-sliders-h"></i> Model Parameters</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('settings.update_model_params') }}" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="form-group">
+                        <label for="MODEL_NAME">Model</label>
+                        <select class="form-control" id="MODEL_NAME" name="MODEL_NAME">
+                            <option value="gpt-4-vision-preview" {% if env_vars.MODEL_NAME == 'gpt-4-vision-preview' %}selected{% endif %}>GPT-4 Vision Preview</option>
+                            <option value="gpt-4o" {% if env_vars.MODEL_NAME == 'gpt-4o' %}selected{% endif %}>GPT-4o</option>
+                            <option value="gpt-4-turbo" {% if env_vars.MODEL_NAME == 'gpt-4-turbo' %}selected{% endif %}>GPT-4 Turbo</option>
+                        </select>
+                        <small class="form-text text-muted">Select the OpenAI model to use for image analysis.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="MAX_TOKENS">Max Tokens</label>
+                        <input type="number" class="form-control" id="MODEL_MAX_TOKENS" name="MAX_TOKENS" value="{{ env_vars.MAX_TOKENS }}">
+                        <small class="form-text text-muted">Maximum number of tokens in the response.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="TEMPERATURE">Temperature</label>
+                        <input type="number" step="0.1" min="0" max="2" class="form-control" id="TEMPERATURE" name="TEMPERATURE" value="{{ env_vars.TEMPERATURE|default(0.5) }}">
+                        <small class="form-text text-muted">Controls randomness (0-2).<br>Lower values are more deterministic.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="IMAGE_DETAIL">Image Detail Level</label>
+                        <select class="form-control" id="IMAGE_DETAIL" name="IMAGE_DETAIL">
+                            <option value="auto" {% if env_vars.IMAGE_DETAIL == 'auto' %}selected{% endif %}>Auto</option>
+                            <option value="low" {% if env_vars.IMAGE_DETAIL == 'low' %}selected{% endif %}>Low</option>
+                            <option value="high" {% if env_vars.IMAGE_DETAIL == 'high' %}selected{% endif %}>High</option>
+                        </select>
+                        <small class="form-text text-muted">Detail level for image analysis.<br>Higher detail costs more tokens.</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Save Model Parameters</button>
+                </form>
+            </div>
+        </div>
+
         <div class="card mb-4">
             <div class="card-header">
                 <h5><i class="fas fa-trash-alt"></i> Clean Directories</h5>
@@ -333,6 +212,21 @@
                         </div>
                         <small>Delete all files in the reports directory.</small>
                     </a>
+                    <form action="{{ url_for('settings.clear_cache') }}" method="post" class="mt-2">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn btn-warning w-100" onclick="return confirm('Are you sure you want to clear the cache and reload registry? This will refresh all file information.');">
+                            <i class="fas fa-trash-alt"></i> Clear Cache and Reload Registry
+                        </button>
+                        <small class="text-muted">Use this if the dashboard shows incorrect information after deleting files.</small>
+                    </form>
+
+                    <form action="{{ url_for('settings.clean_all_data') }}" method="post" class="mt-3">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn btn-danger w-100" onclick="return confirm('WARNING: Are you sure you want to delete ALL files in ALL data directories? This action cannot be undone!');">
+                            <i class="fas fa-exclamation-triangle"></i> Clean ALL Data Directories
+                        </button>
+                        <small class="text-muted">WARNING: This will delete ALL files in ALL data directories (downloads, metadata, analysis, upload, uploaded, processed, reports).</small>
+                    </form>
                 </div>
             </div>
         </div>

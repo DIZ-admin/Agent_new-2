@@ -8,6 +8,26 @@
         object-fit: cover;
         border-radius: 4px;
     }
+    
+    .photo-thumbnail.lazy {
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    
+    .photo-thumbnail.lazy.loaded {
+        opacity: 1;
+    }
+    
+    .photo-thumbnail-placeholder {
+        width: 100px;
+        height: 100px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #f8f9fa;
+        color: #6c757d;
+        border-radius: 4px;
+    }
 </style>
 <div class="row">
     <div class="col-md-12">
@@ -24,6 +44,7 @@
             </div>
             <div class="card-body">
                 <form action="{{ url_for('photos.upload') }}" method="post" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="form-group">
                         <label for="photos">Select photos to upload:</label>
                         <input type="file" class="form-control-file" id="photos" name="photos" multiple accept="image/*">
@@ -82,7 +103,10 @@
                                     <tr>
                                         <td>
                                             <a href="{{ url_for('photos.view_photo', filename=photo.name) }}" target="_blank">
-                                                <img src="{{ url_for('photos.view_photo', filename=photo.name) }}" class="photo-thumbnail" alt="{{ photo.name }}">
+                                                <div class="photo-thumbnail-placeholder">
+                                                    <i class="fas fa-image"></i>
+                                                </div>
+                                                <img data-src="{{ url_for('photos.view_photo', filename=photo.name) }}" class="photo-thumbnail lazy" alt="{{ photo.name }}">
                                             </a>
                                         </td>
                                         <td>{{ photo.name }}</td>
@@ -127,7 +151,10 @@
                                         <td>
                                             {% if photo.original_filename %}
                                             <a href="{{ url_for('photos.view_photo', filename=photo.original_filename) }}" target="_blank">
-                                                <img src="{{ url_for('photos.view_photo', filename=photo.original_filename) }}" class="photo-thumbnail" alt="{{ photo.name }}" onerror="this.onerror=null; this.src='/static/img/no-image.png'; this.alt='Image not available';">
+                                                <div class="photo-thumbnail-placeholder">
+                                                    <i class="fas fa-image"></i>
+                                                </div>
+                                                <img data-src="{{ url_for('photos.view_photo', filename=photo.original_filename) }}" class="photo-thumbnail lazy" alt="{{ photo.name }}" onerror="this.onerror=null; this.src='/static/img/no-image.png'; this.alt='Image not available';">
                                             </a>
                                             {% else %}
                                             <div class="photo-thumbnail bg-light d-flex align-items-center justify-content-center">
@@ -176,7 +203,10 @@
                                     <tr>
                                         <td>
                                             <a href="{{ url_for('photos.view_photo', filename=photo.name) }}" target="_blank">
-                                                <img src="{{ url_for('photos.view_photo', filename=photo.name) }}" class="photo-thumbnail" alt="{{ photo.name }}" onerror="this.onerror=null; this.src='/static/img/no-image.png'; this.alt='Image not available';">
+                                                <div class="photo-thumbnail-placeholder">
+                                                    <i class="fas fa-image"></i>
+                                                </div>
+                                                <img data-src="{{ url_for('photos.view_photo', filename=photo.name) }}" class="photo-thumbnail lazy" alt="{{ photo.name }}" onerror="this.onerror=null; this.src='/static/img/no-image.png'; this.alt='Image not available';">
                                             </a>
                                         </td>
                                         <td>{{ photo.name }}</td>
@@ -220,7 +250,10 @@
                                     <tr>
                                         <td>
                                             <a href="{{ url_for('photos.view_photo', filename=photo.name) }}" target="_blank">
-                                                <img src="{{ url_for('photos.view_photo', filename=photo.name) }}" class="photo-thumbnail" alt="{{ photo.name }}" onerror="this.onerror=null; this.src='/static/img/no-image.png'; this.alt='Image not available';">
+                                                <div class="photo-thumbnail-placeholder">
+                                                    <i class="fas fa-image"></i>
+                                                </div>
+                                                <img data-src="{{ url_for('photos.view_photo', filename=photo.name) }}" class="photo-thumbnail lazy" alt="{{ photo.name }}" onerror="this.onerror=null; this.src='/static/img/no-image.png'; this.alt='Image not available';">
                                             </a>
                                         </td>
                                         <td>{{ photo.name }}</td>
@@ -275,4 +308,107 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Lazy loading for images
+        const lazyImages = [].slice.call(document.querySelectorAll("img.lazy"));
+        
+        if ("IntersectionObserver" in window) {
+            // Use Intersection Observer API for modern browsers
+            const lazyImageObserver = new IntersectionObserver(function(entries, observer) {
+                entries.forEach(function(entry) {
+                    if (entry.isIntersecting) {
+                        const lazyImage = entry.target;
+                        const placeholder = lazyImage.previousElementSibling;
+                        
+                        // Set the source and handle loading
+                        lazyImage.onload = function() {
+                            // Hide placeholder and show image when loaded
+                            if (placeholder && placeholder.classList.contains('photo-thumbnail-placeholder')) {
+                                placeholder.style.display = 'none';
+                            }
+                            lazyImage.classList.add('loaded');
+                        };
+                        
+                        // Set image source
+                        lazyImage.src = lazyImage.dataset.src;
+                        
+                        // Stop observing the element
+                        observer.unobserve(lazyImage);
+                    }
+                });
+            }, {
+                rootMargin: "100px" // Load images when they're 100px from viewport
+            });
+            
+            lazyImages.forEach(function(lazyImage) {
+                lazyImageObserver.observe(lazyImage);
+            });
+        } else {
+            // Fallback for browsers without Intersection Observer support
+            function lazyLoad() {
+                let active = false;
+                
+                if (active === false) {
+                    active = true;
+                    
+                    setTimeout(function() {
+                        lazyImages.forEach(function(lazyImage) {
+                            if ((lazyImage.getBoundingClientRect().top <= window.innerHeight && 
+                                lazyImage.getBoundingClientRect().bottom >= 0) && 
+                                getComputedStyle(lazyImage).display !== "none") {
+                                
+                                const placeholder = lazyImage.previousElementSibling;
+                                
+                                // Set the source and handle loading
+                                lazyImage.onload = function() {
+                                    // Hide placeholder and show image when loaded
+                                    if (placeholder && placeholder.classList.contains('photo-thumbnail-placeholder')) {
+                                        placeholder.style.display = 'none';
+                                    }
+                                    lazyImage.classList.add('loaded');
+                                };
+                                
+                                lazyImage.src = lazyImage.dataset.src;
+                                
+                                // Remove from lazy images array
+                                lazyImages = lazyImages.filter(function(image) {
+                                    return image !== lazyImage;
+                                });
+                                
+                                // If all images are loaded, stop checking
+                                if (lazyImages.length === 0) {
+                                    document.removeEventListener("scroll", lazyLoad);
+                                    window.removeEventListener("resize", lazyLoad);
+                                    window.removeEventListener("orientationchange", lazyLoad);
+                                }
+                            }
+                        });
+                        
+                        active = false;
+                    }, 200);
+                }
+            }
+            
+            // Listen to events
+            document.addEventListener("scroll", lazyLoad);
+            window.addEventListener("resize", lazyLoad);
+            window.addEventListener("orientationchange", lazyLoad);
+            
+            // Initial load
+            lazyLoad();
+        }
+        
+        // Initialize automatic tab switching based on URL hash
+        let hash = window.location.hash;
+        if (hash) {
+            let tab = hash.substring(1);
+            let tabEl = document.getElementById(tab + '-tab');
+            if (tabEl) {
+                tabEl.click();
+            }
+        }
+    });
+</script>
 {% endblock %}

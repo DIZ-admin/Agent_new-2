@@ -13,6 +13,8 @@ from datetime import datetime
 from src.utils.config import get_config, reload_config
 from src.utils.logging import get_logger
 from src.utils.paths import get_path_manager
+from src.web.file_cache import get_file_cache
+from src.utils.registry import get_registry
 
 # Get logger
 logger = get_logger('web.settings')
@@ -51,17 +53,36 @@ def index():
         'IMAGE_DETAIL': os.environ.get('IMAGE_DETAIL', 'high'),
         'LOG_LEVEL': os.environ.get('LOG_LEVEL', ''),
         'LOG_FILE': os.environ.get('LOG_FILE', ''),
-        'OPENAI_PROMPT_TYPE': os.environ.get('OPENAI_PROMPT_TYPE', 'default'),
-        'OPENAI_PROMPT_ROLE': os.environ.get('OPENAI_PROMPT_ROLE', ''),
-        'OPENAI_PROMPT_INSTRUCTIONS_PRE': os.environ.get('OPENAI_PROMPT_INSTRUCTIONS_PRE', ''),
-        'OPENAI_PROMPT_INSTRUCTIONS_POST': os.environ.get('OPENAI_PROMPT_INSTRUCTIONS_POST', ''),
-        'OPENAI_PROMPT_EXAMPLE': os.environ.get('OPENAI_PROMPT_EXAMPLE', '')
+        'OPENAI_PROMPT_TYPE': os.environ.get('OPENAI_PROMPT_TYPE', 'optimized')
     }
+
+    # Get available prompt files
+    prompt_files = {}
+    config_dir = config.config_dir
+    for filename in os.listdir(config_dir):
+        if filename.endswith('_prompt.env'):
+            prompt_type = filename.replace('_prompt.env', '')
+            prompt_files[prompt_type] = filename
+
+    # Generate preview of the current prompt
+    prompt_preview = "No prompt template selected"
+    current_prompt_type = env_vars['OPENAI_PROMPT_TYPE']
+    if current_prompt_type in prompt_files:
+        prompt_file = prompt_files[current_prompt_type]
+        prompt_path = os.path.join(config_dir, prompt_file)
+        try:
+            with open(prompt_path, 'r', encoding='utf-8') as f:
+                prompt_preview = f.read()
+        except Exception as e:
+            logger.error(f"Error reading prompt file: {str(e)}")
+            prompt_preview = f"Error reading prompt file: {str(e)}"
 
     return render_template('settings/index.html',
                           config=config,
                           schema=schema,
-                          env_vars=env_vars)
+                          env_vars=env_vars,
+                          prompt_files=prompt_files,
+                          prompt_preview=prompt_preview)
 
 @bp.route('/update_env', methods=['POST'])
 def update_env():
@@ -177,13 +198,7 @@ def clean_directory(directory):
 def update_openai_prompt():
     """Update OpenAI prompt settings."""
     # Get form data
-    prompt_vars = {
-        'OPENAI_PROMPT_TYPE': request.form.get('OPENAI_PROMPT_TYPE', 'default'),
-        'OPENAI_PROMPT_ROLE': request.form.get('OPENAI_PROMPT_ROLE', ''),
-        'OPENAI_PROMPT_INSTRUCTIONS_PRE': request.form.get('OPENAI_PROMPT_INSTRUCTIONS_PRE', ''),
-        'OPENAI_PROMPT_INSTRUCTIONS_POST': request.form.get('OPENAI_PROMPT_INSTRUCTIONS_POST', ''),
-        'OPENAI_PROMPT_EXAMPLE': request.form.get('OPENAI_PROMPT_EXAMPLE', '')
-    }
+    prompt_type = request.form.get('OPENAI_PROMPT_TYPE', 'optimized')
 
     # Update environment variables in config.env
     try:
@@ -196,7 +211,7 @@ def update_openai_prompt():
 
         # Update values
         new_lines = []
-        updated_keys = set()
+        updated_openai_prompt_type = False
 
         for line in lines:
             line = line.strip()
@@ -208,27 +223,18 @@ def update_openai_prompt():
                 key, value = line.split('=', 1)
                 key = key.strip()
 
-                if key in prompt_vars:
-                    # Properly format the value for .env file
-                    # Use triple quotes for multiline values
-                    value = prompt_vars[key]
-                    if '\n' in value:
-                        # For multiline values, use triple quotes and preserve newlines
-                        new_lines.append(f'{key}="""{value}"""')
-                    else:
-                        # For single line values, use regular quotes
-                        new_lines.append(f'{key}="{value}"')
-                    updated_keys.add(key)
+                if key == 'OPENAI_PROMPT_TYPE':
+                    # Update the prompt type
+                    new_lines.append(f'{key}="{prompt_type}"')
+                    updated_openai_prompt_type = True
                 else:
                     new_lines.append(line)
             else:
                 new_lines.append(line)
 
-        # Add any keys that weren't in the file
-        for key, value in prompt_vars.items():
-            if key not in updated_keys:
-                escaped_value = value.replace('"', '\\"').replace('\n', '\\n')
-                new_lines.append(f'{key}="{escaped_value}"')
+        # Add OPENAI_PROMPT_TYPE if it wasn't in the file
+        if not updated_openai_prompt_type:
+            new_lines.append(f'OPENAI_PROMPT_TYPE="{prompt_type}"')
 
         # Write back to file
         with open(env_path, 'w', encoding='utf-8') as f:
@@ -237,11 +243,11 @@ def update_openai_prompt():
         # Reload configuration
         reload_config()
 
-        flash("OpenAI prompt settings updated successfully. Changes have been applied.", "success")
-        logger.info("OpenAI prompt settings updated via web interface and configuration reloaded")
+        flash("OpenAI prompt template updated successfully. Changes have been applied.", "success")
+        logger.info(f"OpenAI prompt template updated to '{prompt_type}' via web interface and configuration reloaded")
     except Exception as e:
-        flash(f"Error updating OpenAI prompt settings: {str(e)}", "danger")
-        logger.error(f"Error updating OpenAI prompt settings: {str(e)}")
+        flash(f"Error updating OpenAI prompt template: {str(e)}", "danger")
+        logger.error(f"Error updating OpenAI prompt template: {str(e)}")
 
     return redirect(url_for('settings.index'))
 
@@ -383,5 +389,73 @@ def update_model_params():
     except Exception as e:
         flash(f"Error updating model parameters: {str(e)}", "danger")
         logger.error(f"Error updating model parameters: {str(e)}")
+
+    return redirect(url_for('settings.index'))
+
+@bp.route('/clear_cache', methods=['POST'])
+def clear_cache():
+    """Clear the file cache."""
+    try:
+        # Get the file cache
+        file_cache = get_file_cache()
+
+        # Clear the cache
+        file_cache.clear()
+
+        # Get registry and reload it
+        registry = get_registry()
+        registry.reload()
+
+        flash("Cache and registry cleared successfully", "success")
+        logger.info("Cache and registry cleared via web interface")
+    except Exception as e:
+        flash(f"Error clearing cache: {str(e)}", "danger")
+        logger.error(f"Error clearing cache: {str(e)}")
+
+    return redirect(url_for('settings.index'))
+
+@bp.route('/clean_all_data', methods=['POST'])
+def clean_all_data():
+    """Clean all data directories."""
+    path_manager = get_path_manager()
+
+    try:
+        # Get all directories to clean
+        directories = {
+            'downloads': path_manager.downloads_dir,
+            'metadata': path_manager.metadata_dir,
+            'analysis': path_manager.analysis_dir,
+            'upload': path_manager.upload_dir,
+            'upload_metadata': path_manager.upload_metadata_dir,
+            'uploaded': path_manager.uploaded_dir,
+            'processed': path_manager.processed_dir,
+            'reports': path_manager.reports_dir
+        }
+
+        total_count = 0
+
+        # Clean each directory
+        for dir_name, dir_path in directories.items():
+            count = 0
+            if os.path.exists(dir_path):
+                for filename in os.listdir(dir_path):
+                    file_path = os.path.join(dir_path, filename)
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                        count += 1
+            logger.info(f"Cleaned {count} files from {dir_name} directory")
+            total_count += count
+
+        # Clear the cache and reload registry
+        file_cache = get_file_cache()
+        file_cache.clear()
+        registry = get_registry()
+        registry.reload()
+
+        flash(f"Successfully cleaned {total_count} files from all data directories", "success")
+        logger.info(f"Cleaned {total_count} files from all data directories via web interface")
+    except Exception as e:
+        flash(f"Error cleaning all data: {str(e)}", "danger")
+        logger.error(f"Error cleaning all data: {str(e)}")
 
     return redirect(url_for('settings.index'))

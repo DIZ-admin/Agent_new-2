@@ -41,5 +41,5 @@ services:
       - FLASK_APP=src.web_server
       - FLASK_ENV=development
     ports:
-      - "5001:5000"
+      - "8080:5000"
     command: python -m src.web_server

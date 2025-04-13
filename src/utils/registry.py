@@ -51,6 +51,21 @@ class FileRegistry:
 
         logger.info(f"File registry initialized with {len(self.processed['files'])} processed and {len(self.uploaded['files'])} uploaded files")
 
+    def reload(self):
+        """
+        Reload registry from files.
+        """
+        logger.info("Reloading file registry")
+        self.processed = self._load_registry(self.processed_file)
+        self.uploaded = self._load_registry(self.uploaded_file)
+        self.file_hashes = self._load_registry(self.file_hashes_file)
+
+        # Initialize file_hashes if needed
+        if "hashes" not in self.file_hashes:
+            self.file_hashes["hashes"] = {}
+
+        logger.info(f"File registry reloaded with {len(self.processed['files'])} processed and {len(self.uploaded['files'])} uploaded files")
+
     def _load_registry(self, file_path: Path) -> Dict[str, Any]:
         """
         Load registry from file or create a new one.

@@ -61,7 +61,7 @@
                         </tr>
                     </tbody>
                 </table>
-                
+
                 {% if process.status == 'running' or process.status == 'starting' %}
                 <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#killProcessModal">
                     <i class="fas fa-stop"></i> Kill Process
@@ -70,7 +70,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-6">
         <div class="card mb-4">
             <div class="card-header">
@@ -113,7 +113,7 @@
                 {% endif %}
             </div>
         </div>
-        
+
         {% if process.status == 'running' or process.status == 'starting' %}
         <div class="card mb-4">
             <div class="card-header">
@@ -161,11 +161,11 @@
 
 <script>
     $(document).ready(function() {
-        // Auto-refresh process details every 2 seconds
+        // Auto-refresh process details every 3 seconds
         {% if process.status == 'running' or process.status == 'starting' %}
-        setInterval(refreshProcess, 2000);
+        var refreshInterval = setInterval(refreshProcess, 3000);
         {% endif %}
-        
+
         function refreshProcess() {
             $.ajax({
                 url: '{{ url_for("processes.process_status", pid=process.pid) }}',
@@ -180,55 +180,58 @@
                         statusHtml = '<span class="badge badge-primary">Starting</span>';
                     } else if (data.status === 'finished') {
                         statusHtml = '<span class="badge badge-success">Finished</span>';
-                        // Reload page to show finished state
-                        location.reload();
+                        // Stop refreshing and reload page to show finished state
+                        clearInterval(refreshInterval);
+                        setTimeout(function() { location.reload(); }, 500);
                     } else if (data.status === 'error') {
                         statusHtml = '<span class="badge badge-danger">Error</span>';
-                        // Reload page to show error state
-                        location.reload();
+                        // Stop refreshing and reload page to show error state
+                        clearInterval(refreshInterval);
+                        setTimeout(function() { location.reload(); }, 500);
                     } else if (data.status === 'killed') {
                         statusHtml = '<span class="badge badge-warning">Killed</span>';
-                        // Reload page to show killed state
-                        location.reload();
+                        // Stop refreshing and reload page to show killed state
+                        clearInterval(refreshInterval);
+                        setTimeout(function() { location.reload(); }, 500);
                     } else {
                         statusHtml = '<span class="badge badge-secondary">' + data.status + '</span>';
                     }
-                    
+
                     $('#process-status').html(statusHtml);
-                    
+
                     // Update duration
                     $('#process-duration').text(data.duration);
-                    
+
                     // Update last updated
                     $('#process-last-updated').text(data.last_updated_formatted);
-                    
+
                     // Update progress if available
                     if (data.details && data.details.progress !== undefined) {
                         $('#progress-bar').css('width', data.details.progress + '%');
                         $('#progress-bar').attr('aria-valuenow', data.details.progress);
                         $('#progress-bar').text(data.details.progress + '%');
-                        
+
                         if (data.details.progress_message !== undefined) {
                             $('#progress-message').text(data.details.progress_message);
                         }
                     }
-                    
+
                     // Update details
                     if (data.details) {
                         var detailsHtml = '';
                         for (var key in data.details) {
                             var value = data.details[key];
                             detailsHtml += '<tr><td>' + key + '</td><td>';
-                            
+
                             if (typeof value === 'object') {
                                 detailsHtml += '<pre>' + JSON.stringify(value, null, 2) + '</pre>';
                             } else {
                                 detailsHtml += value;
                             }
-                            
+
                             detailsHtml += '</td></tr>';
                         }
-                        
+
                         $('#process-details').html(detailsHtml);
                     }
                 }
