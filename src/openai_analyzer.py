@@ -39,39 +39,81 @@ MAX_TOKENS = config.openai.max_tokens
 METADATA_SCHEMA_FILE = config.file.metadata_schema_file
 
 
+def get_prompt_type():
+    """
+    Get the current prompt type from configuration or environment.
+
+    Returns:
+        str: Prompt type (minimal, structured_simple, accuracy_focused, examples, step_by_step, optimized, default)
+    """
+    # Check environment variable first
+    prompt_type = os.environ.get('OPENAI_PROMPT_TYPE', '').lower()
+
+    # If not set in environment, check config file
+    if not prompt_type:
+        try:
+            current_config = get_config()
+            prompt_type = getattr(current_config.openai, 'prompt_type', '').lower()
+        except Exception:
+            prompt_type = ''
+
+    # Validate prompt type
+    valid_types = ['minimal', 'structured_simple', 'accuracy_focused', 'examples', 'step_by_step', 'optimized', 'default']
+    if prompt_type not in valid_types:
+        prompt_type = 'default'  # Default to standard config
+
+    return prompt_type
+
+
 def get_openai_prompt_settings():
     """
-    Get the current OpenAI prompt settings from the configuration.
-    Tries to load from optimized_prompt.env first, falls back to config settings.
+    Get the current OpenAI prompt settings based on the selected prompt type.
     This allows the settings to be updated without restarting the application.
 
     Returns:
         tuple: (role, instructions_pre, instructions_post, example)
     """
-    # Try to load from optimized prompt file first
-    optimized_prompt_path = os.path.join('config', 'optimized_prompt.env')
-    if os.path.exists(optimized_prompt_path):
-        logger.info("Using optimized prompt settings")
-        try:
-            # Load optimized prompt settings
-            with open(optimized_prompt_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+    # Get the prompt type
+    prompt_type = get_prompt_type()
+    logger.info(f"Using prompt type: {prompt_type}")
 
-            # Extract settings using regex
-            role_match = re.search(r'OPENAI_PROMPT_ROLE="(.+?)"', content, re.DOTALL)
-            instructions_pre_match = re.search(r'OPENAI_PROMPT_INSTRUCTIONS_PRE="(.+?)"', content, re.DOTALL)
-            instructions_post_match = re.search(r'OPENAI_PROMPT_INSTRUCTIONS_POST="(.+?)"', content, re.DOTALL)
-            example_match = re.search(r'OPENAI_PROMPT_EXAMPLE="(.+?)"', content, re.DOTALL)
+    # Map prompt type to file name
+    prompt_files = {
+        'minimal': 'minimal_prompt.env',
+        'structured_simple': 'structured_simple_prompt.env',
+        'accuracy_focused': 'accuracy_focused_prompt.env',
+        'examples': 'examples_prompt.env',
+        'step_by_step': 'step_by_step_prompt.env',
+        'optimized': 'optimized_prompt.env'
+    }
 
-            role = role_match.group(1) if role_match else ''
-            instructions_pre = instructions_pre_match.group(1) if instructions_pre_match else ''
-            instructions_post = instructions_post_match.group(1) if instructions_post_match else ''
-            example = example_match.group(1) if example_match else ''
+    # If using a custom prompt file
+    if prompt_type in prompt_files:
+        prompt_file = prompt_files[prompt_type]
+        prompt_path = os.path.join('config', prompt_file)
 
-            return role, instructions_pre, instructions_post, example
-        except Exception as e:
-            logger.error(f"Error loading optimized prompt settings: {str(e)}")
-            logger.info("Falling back to default prompt settings")
+        if os.path.exists(prompt_path):
+            logger.info(f"Loading prompt settings from {prompt_file}")
+            try:
+                # Load prompt settings from file
+                with open(prompt_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+
+                # Extract settings using regex
+                role_match = re.search(r'OPENAI_PROMPT_ROLE="(.+?)"', content, re.DOTALL)
+                instructions_pre_match = re.search(r'OPENAI_PROMPT_INSTRUCTIONS_PRE="(.+?)"', content, re.DOTALL)
+                instructions_post_match = re.search(r'OPENAI_PROMPT_INSTRUCTIONS_POST="(.+?)"', content, re.DOTALL)
+                example_match = re.search(r'OPENAI_PROMPT_EXAMPLE="(.+?)"', content, re.DOTALL)
+
+                role = role_match.group(1) if role_match else ''
+                instructions_pre = instructions_pre_match.group(1) if instructions_pre_match else ''
+                instructions_post = instructions_post_match.group(1) if instructions_post_match else ''
+                example = example_match.group(1) if example_match else ''
+
+                return role, instructions_pre, instructions_post, example
+            except Exception as e:
+                logger.error(f"Error loading prompt settings from {prompt_file}: {str(e)}")
+                logger.info("Falling back to default prompt settings")
 
     # Fall back to configuration
     current_config = get_config()
