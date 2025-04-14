@@ -13,9 +13,10 @@ services:
     environment:
       - TZ=Europe/Berlin
       - PYTHONUNBUFFERED=1
-    # По умолчанию запускаем авто-процесс
-    command: python -m src.auto_process
+    # По умолчанию запускаем bash для ожидания команд
+    command: bash -c "echo 'Контейнер запущен и ожидает команд. Используйте веб-интерфейс для запуска процессов.' && tail -f /dev/null"
     # Можно запустить отдельный модуль, раскомментировав нужную строку:
+    # command: python -m src.auto_process
     # command: python -m src.metadata_schema
     # command: python -m src.photo_metadata
     # command: python -m src.openai_analyzer
