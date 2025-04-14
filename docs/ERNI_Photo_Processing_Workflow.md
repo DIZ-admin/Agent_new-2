@@ -75,7 +75,8 @@ Dieses Projekt stellt ein automatisiertes System zur Verarbeitung von Fotografie
 **Prozess:**
 1. Das System findet Fotografien im Verzeichnis `/app/data/downloads`
 2. Lädt das Metadatenschema aus der Datei `sharepoint_choices.json`
-3. Für jede Fotografie:
+3. Lädt den ausgewählten Prompt-Typ aus der entsprechenden Datei in `/app/config/prompts/`
+4. Für jede Fotografie:
    - Überprüft, ob sie bereits analysiert wurde (nach Dateihash)
    - Extrahiert und formatiert die EXIF-Metadaten
    - Bereitet den Prompt für OpenAI vor, einschließlich der EXIF-Daten
@@ -91,6 +92,7 @@ Dieses Projekt stellt ein automatisiertes System zur Verarbeitung von Fotografie
 - Begrenzung der gleichzeitigen Anfragen (OPENAI_CONCURRENCY_LIMIT = 10)
 - Mechanismus für Wiederholungsversuche bei Fehlern
 - Caching der Analyseergebnisse
+- Verschiedene Prompt-Typen für unterschiedliche Analyseanforderungen
 
 **Ergebnis:**
 - JSON-Dateien mit Analyseergebnissen im Verzeichnis `/app/data/analysis`
@@ -144,6 +146,7 @@ Dieses Projekt stellt ein automatisiertes System zur Verarbeitung von Fotografie
 - Batch-Hochladen von Dateien (in Gruppen von 10)
 - Mechanismus für Wiederholungsversuche bei Fehlern
 - Aktualisierung des Registers der hochgeladenen Dateien
+- Überprüfung auf bereits hochgeladene Dateien, um Duplikate zu vermeiden
 
 **Ergebnis:**
 - Fotografien, die mit angereicherten Metadaten in SharePoint hochgeladen wurden
@@ -170,6 +173,29 @@ Dieses Projekt stellt ein automatisiertes System zur Verarbeitung von Fotografie
 **Ergebnis:**
 - Vollständiger Verarbeitungszyklus von Fotografien von der Hochladung bis zur Rückladung mit angereicherten Metadaten
 
+### 8. Web-Interface
+
+**Modul:** `web_server.py`
+
+**Prozess:**
+1. Das System startet einen Flask-Webserver
+2. Stellt eine Benutzeroberfläche für die Verwaltung des Systems bereit:
+   - Dashboard mit Statistiken und schnellem Zugriff auf Funktionen
+   - Fotoverwaltung (Anzeige, Analyse, Upload)
+   - Protokollverwaltung
+   - Prozessverwaltung
+   - Systemeinstellungen
+
+**Besonderheiten:**
+- Benutzerfreundliche Oberfläche mit Bootstrap 5
+- CSRF-Schutz für Formulare
+- Verschiedene Ansichten für verschiedene Fotostadien
+- Einstellungen für OpenAI-Prompts und Modellparameter
+- Möglichkeit zur Bereinigung von Datenverzeichnissen
+
+**Ergebnis:**
+- Webbasierte Benutzeroberfläche für die Verwaltung des gesamten Systems
+
 ## Schlüsseltechnische Aspekte
 
 ### 1. Verarbeitung von EXIF-Metadaten
@@ -185,6 +211,7 @@ Dieses Projekt stellt ein automatisiertes System zur Verarbeitung von Fotografie
 - Erstellung des Prompts mit Einbeziehung von EXIF-Daten
 - Optimierung von Bildern vor dem Versand
 - Parsing und Validierung der JSON-Antwort
+- Verschiedene Prompt-Typen für unterschiedliche Analyseanforderungen
 
 ### 3. Intelligente Verknüpfung von Daten
 
@@ -214,13 +241,20 @@ Dieses Projekt stellt ein automatisiertes System zur Verarbeitung von Fotografie
 - Speicherung von Zwischenergebnissen
 - Register der verarbeiteten Dateien zur Vermeidung von Doppelverarbeitungen
 
+### 7. Web-Interface
+
+- Benutzerfreundliche Oberfläche mit Bootstrap 5
+- CSRF-Schutz für Formulare
+- Verschiedene Ansichten für verschiedene Fotostadien
+- Einstellungen für OpenAI-Prompts und Modellparameter
+
 ## Datenflussdiagramm
 
 ```
 SharePoint (Referenzfotos) --> Hochladen von Fotografien --> Extraktion von EXIF --> Analyse OpenAI --> Generierung von Metadaten --> Hochladen in SharePoint
     |                                                       |                   |                      |
     |                                                       v                   v                      |
-    |                                                EXIF-Metadaten --> Intelligente Verknüpfung |
+    |                                                EXIF-Metadaten --> Intelligente Verknüpfung       |
     |                                                                           |                      |
     v                                                                           v                      v
 Metadatenschema ------------------------------------------------> Validierung der Metadaten --> Aktualisierung der Metadaten
@@ -233,3 +267,5 @@ Dieses Projekt stellt eine umfassende Lösung zur Automatisierung der Verarbeitu
 Zu den wichtigsten Merkmalen gehören die intelligente Verknüpfung von Daten aus verschiedenen Quellen, die Nutzung von künstlicher Intelligenz zur Analyse von Bildern und die automatische Anreicherung von Metadaten unter Berücksichtigung des Kontexts der Fotografien.
 
 Das System wurde mit Blick auf Skalierbarkeit, Fehlertoleranz und Leistung entworfen, was eine effiziente und zuverlässige Verarbeitung großer Mengen von Fotografien ermöglicht.
+
+Die Webschnittstelle bietet eine benutzerfreundliche Möglichkeit zur Verwaltung des gesamten Systems und ermöglicht es Benutzern, den Verarbeitungsprozess zu überwachen und zu steuern.
