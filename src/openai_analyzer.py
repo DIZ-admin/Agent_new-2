@@ -717,7 +717,7 @@ def process_photos_with_openai(photos, schema):
                 del photo['error']
 
             logger.info(f"Retrying analysis for {photo['name']}...")
-            processed_photo = process_photo_with_openai(photo, prompt)
+            processed_photo = process_photo_with_openai(photo, schema)
             processed_photos.append(processed_photo)
 
             # Register the file hash if retry was successful
