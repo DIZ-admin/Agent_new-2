@@ -2,8 +2,11 @@
 data/
 logs/
 
-# Конфиденциальные настройки (раскомментируйте, если не хотите добавлять в репозиторий)
-# config/config.env
+# Конфиденциальные настройки
+config/config.env
+config/processes.json
+config/sharepoint_choices.json
+.DS_Store
 
 # Python кэши
 __pycache__/
@@ -38,5 +41,5 @@ ENV/
 *.swp
 *.swo
 
-# Файлы Docker 
+# Файлы Docker
 .dockerignore
