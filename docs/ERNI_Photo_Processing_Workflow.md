@@ -82,7 +82,7 @@ Dieses Projekt stellt ein automatisiertes System zur Verarbeitung von Fotografie
    - Bereitet den Prompt für OpenAI vor, einschließlich der EXIF-Daten
    - Optimiert das Bild (reduziert auf eine maximale Größe von 1024 Pixel)
    - Kodiert das Bild in base64
-   - Sendet eine Anfrage an die OpenAI API (Modell GPT-4o)
+   - Sendet eine Anfrage an die OpenAI API (Modell GPT-4o, GPT-4-vision-preview oder GPT-4-turbo, je nach Konfiguration)
    - Erhält und analysiert die JSON-Antwort
    - Speichert die Analyseergebnisse in einer JSON-Datei im Verzeichnis `/app/data/analysis`
    - Fügt einen Eintrag in das Register der analysierten Dateien hinzu

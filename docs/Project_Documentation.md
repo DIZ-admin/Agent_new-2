@@ -54,17 +54,15 @@ The system follows a modular architecture with these main components:
    - Runs all scripts in sequence
    - Manages logging and error handling
 
-### Frontend Components (TypeScript/React)
+### Frontend Components (Flask/Jinja2)
 
-The web interface is built with Next.js and React, providing components for:
+The web interface is built with Flask and Jinja2 templates, providing components for:
 
-1. **Analysis Progress Tracking** (`AnalysisProgressBar.tsx`)
-2. **Analysis Results Display** (`AnalysisResultModal.tsx`, `AnalysisResultsTable.tsx`)
-3. **Analysis Settings Configuration** (`AnalysisSettingsPanel.tsx`)
-4. **Metadata Editing** (`MetadataEditor.tsx`)
-5. **Photo Analysis Display** (`PhotoAnalysisCard.tsx`)
-6. **SharePoint and OpenAI Integration** (`sharepoint.ts`, `openai.ts`)
-7. **Reporting** (`reports.ts`)
+1. **Dashboard** (`templates/main/index.html`) - Overview and quick access to functions
+2. **Photos Management** (`templates/photos/index.html`, `templates/photos/analysis.html`) - Photo viewing and analysis
+3. **Processes Management** (`templates/processes/index.html`, `templates/processes/view.html`) - Process monitoring
+4. **Settings Management** (`templates/settings/index.html`) - System configuration
+5. **Logs Viewing** - Log monitoring and management
 
 ## Data Flow
 
@@ -82,13 +80,20 @@ The web interface is built with Next.js and React, providing components for:
 /
 ├── config/                  # Configuration files
 │   ├── config.env           # Environment variables
-│   └── sharepoint_choices.json  # SharePoint metadata schema
+│   ├── sharepoint_choices.json  # SharePoint metadata schema
+│   ├── default_prompt.env   # Default OpenAI prompt
+│   ├── optimized_prompt.env # Optimized OpenAI prompt
+│   ├── step_by_step_prompt.env # Step-by-step OpenAI prompt
+│   └── structured_simple_prompt.env # Structured simple OpenAI prompt
 ├── data/                    # Data storage
 │   ├── downloads/           # Downloaded photos
 │   ├── metadata/            # Extracted metadata
 │   ├── analysis/            # OpenAI analysis results
 │   ├── upload/              # Files prepared for upload
+│   │   └── metadata/        # Metadata for upload
 │   ├── uploaded/            # Successfully uploaded files
+│   ├── processed/           # Processed files
+│   ├── registry/            # File registry
 │   └── reports/             # Transfer reports
 ├── docs/                    # Documentation
 ├── logs/                    # Log files
@@ -98,10 +103,37 @@ The web interface is built with Next.js and React, providing components for:
 │   ├── metadata_schema.py   # Schema analyzer
 │   ├── openai_analyzer.py   # AI photo analysis
 │   ├── photo_metadata.py    # Photo metadata extraction
+│   ├── process_wrapper.py   # Process wrapper
 │   ├── sharepoint_auth.py   # SharePoint authentication
 │   ├── sharepoint_uploader.py # SharePoint upload
-│   └── transfer_verification.py # Verification
-└── web/                     # Web interface (Next.js/React)
+│   ├── transfer_verification.py # Verification
+│   ├── web_server.py        # Web server
+│   ├── utils/               # Utility modules
+│   │   ├── api.py           # API utilities
+│   │   ├── config.py        # Configuration utilities
+│   │   ├── logging.py       # Logging utilities
+│   │   ├── paths.py         # Path utilities
+│   │   ├── process_tracker.py # Process tracking
+│   │   ├── registry.py      # File registry
+│   │   └── sharepoint.py    # SharePoint utilities
+│   └── web/                 # Web interface (Flask)
+│       ├── app.py           # Flask application
+│       ├── file_cache.py    # File caching
+│       ├── file_manager.py  # File management
+│       ├── process_monitor.py # Process monitoring
+│       ├── templates/       # HTML templates
+│       │   ├── base.html    # Base template
+│       │   ├── main/        # Main templates
+│       │   ├── photos/      # Photo templates
+│       │   ├── processes/   # Process templates
+│       │   └── settings/    # Settings templates
+│       └── views/           # View functions
+│           ├── logs.py      # Logs views
+│           ├── main.py      # Main views
+│           ├── photos.py    # Photo views
+│           ├── processes.py # Process views
+│           └── settings.py  # Settings views
+└── tests/                   # Test files
 ```
 
 ## Configuration
@@ -116,7 +148,7 @@ The system is configured through environment variables in `config.env`:
 ## Key Technologies
 
 - **Backend**: Python with libraries for SharePoint integration (Office365-REST-Python-Client), image processing (Pillow), and AI (OpenAI API)
-- **Frontend**: TypeScript, Next.js, React, Tailwind CSS
+- **Frontend**: Flask, Jinja2 templates, Bootstrap 5, jQuery
 - **Storage**: Local filesystem (temporary) and SharePoint (permanent)
 - **APIs**: SharePoint REST API, OpenAI API
 
