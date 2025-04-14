@@ -12,7 +12,7 @@ from datetime import datetime
 from src.sharepoint_auth import get_sharepoint_context, get_library
 
 # Import utilities
-from src.utils.paths import get_path_manager, load_json_file
+from src.utils.paths import get_path_manager, load_json_file, standardize_path, move_file
 from src.utils.config import get_config
 from src.utils.logging import get_logger
 from src.utils.registry import get_registry
@@ -155,7 +155,7 @@ def upload_file_to_sharepoint(ctx, library, file_info):
 
         # Move file to uploaded directory
         uploaded_path = UPLOADED_DIR / filename
-        shutil.move(file_path, uploaded_path)
+        move_file(file_path, uploaded_path)
         logger.info(f"File moved to uploaded directory: {uploaded_path}")
 
         # Upload JSON metadata file to SharePoint
@@ -173,7 +173,7 @@ def upload_file_to_sharepoint(ctx, library, file_info):
 
         # Move JSON metadata file to uploaded directory (instead of copying)
         uploaded_metadata_path = UPLOADED_DIR / metadata_filename
-        shutil.move(file_info['metadata_path'], uploaded_metadata_path)
+        move_file(standardize_path(file_info['metadata_path']), uploaded_metadata_path)
         logger.info(f"JSON metadata file moved to uploaded directory: {uploaded_metadata_path}")
 
         # Upload and move original YAML metadata file if it exists
@@ -193,7 +193,7 @@ def upload_file_to_sharepoint(ctx, library, file_info):
 
             # Move original metadata file to uploaded directory (instead of copying)
             uploaded_original_metadata_path = UPLOADED_DIR / original_metadata_filename
-            shutil.move(file_info['original_metadata_path'], uploaded_original_metadata_path)
+            move_file(standardize_path(file_info['original_metadata_path']), uploaded_original_metadata_path)
             logger.info(f"Original metadata file moved to uploaded directory: {uploaded_original_metadata_path}")
 
         # Update registry to mark file as uploaded

@@ -18,7 +18,10 @@
 .
 ├── config/                  # Конфигурационные файлы
 │   ├── config.env           # Переменные окружения
-│   ├── prompts/             # Промпты для OpenAI
+│   ├── default_prompt.env    # Промпт по умолчанию для OpenAI
+│   ├── optimized_prompt.env   # Оптимизированный промпт для OpenAI
+│   ├── step_by_step_prompt.env # Пошаговый промпт для OpenAI
+│   ├── structured_simple_prompt.env # Структурированный простой промпт для OpenAI
 │   └── sharepoint_choices.json # Схема метаданных SharePoint
 ├── data/                    # Данные
 │   ├── analysis/            # Результаты анализа OpenAI
@@ -73,17 +76,20 @@
    SHAREPOINT_SITE_URL=https://your-sharepoint.com/sites/your-site
    SHAREPOINT_USERNAME=your.username@example.com
    SHAREPOINT_PASSWORD=your-password
-   
+
    # Library settings
    SOURCE_LIBRARY_TITLE=SourceLibrary
    SHAREPOINT_LIBRARY=TargetLibrary
-   
+
    # OpenAI settings
    OPENAI_API_KEY=your-openai-api-key
    OPENAI_PROMPT_TYPE=structured_simple
    MODEL_NAME=gpt-4o
    TEMPERATURE=0.1
    IMAGE_DETAIL=high
+   MAX_TOKENS=300
+   OPENAI_REQUESTS_PER_MINUTE=60
+   OPENAI_MAX_TOKENS_PER_MINUTE=90000
    ```
 
 ### Запуск

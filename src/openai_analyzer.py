@@ -11,11 +11,14 @@ import json
 import time
 import base64
 import re
+import threading
+import random
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 import openai
 from PIL import Image
 import io
+import queue
 
 # Import utilities
 from src.utils.paths import get_path_manager, load_json_file, save_json_file
@@ -171,6 +174,130 @@ METADATA_DIR = path_manager.metadata_dir
 ANALYSIS_DIR = path_manager.analysis_dir
 
 # OpenAI client is already initialized with config.openai.api_key
+
+
+class OpenAIRateLimiter:
+    """
+    Rate limiter for OpenAI API requests to avoid hitting rate limits.
+    Implements a token bucket algorithm for rate limiting.
+    """
+
+    def __init__(self, requests_per_minute=60, max_tokens_per_minute=90000):
+        """
+        Initialize the rate limiter.
+
+        Args:
+            requests_per_minute (int): Maximum number of requests per minute
+            max_tokens_per_minute (int): Maximum number of tokens per minute
+        """
+        self.requests_per_minute = requests_per_minute
+        self.max_tokens_per_minute = max_tokens_per_minute
+
+        # Token bucket for requests
+        self.request_tokens = requests_per_minute
+        self.max_request_tokens = requests_per_minute
+
+        # Token bucket for tokens
+        self.tokens = max_tokens_per_minute
+        self.max_tokens = max_tokens_per_minute
+
+        # Lock for thread safety
+        self.lock = threading.Lock()
+
+        # Last refill time
+        self.last_refill_time = time.time()
+
+        # Start the refill thread
+        self.running = True
+        self.refill_thread = threading.Thread(target=self._refill_tokens)
+        self.refill_thread.daemon = True
+        self.refill_thread.start()
+
+        # Queue for pending requests
+        self.request_queue = queue.Queue()
+
+        logger.info(f"OpenAI rate limiter initialized with {requests_per_minute} requests/min and {max_tokens_per_minute} tokens/min")
+
+    def _refill_tokens(self):
+        """
+        Refill tokens periodically based on elapsed time.
+        """
+        while self.running:
+            time.sleep(1)  # Check every second
+
+            with self.lock:
+                current_time = time.time()
+                elapsed_time = current_time - self.last_refill_time
+
+                # Calculate tokens to add based on elapsed time
+                request_tokens_to_add = self.requests_per_minute * elapsed_time / 60
+                tokens_to_add = self.max_tokens_per_minute * elapsed_time / 60
+
+                # Add tokens, but don't exceed max
+                self.request_tokens = min(self.max_request_tokens, self.request_tokens + request_tokens_to_add)
+                self.tokens = min(self.max_tokens, self.tokens + tokens_to_add)
+
+                # Update last refill time
+                self.last_refill_time = current_time
+
+    def wait_for_capacity(self, tokens_needed):
+        """
+        Wait until there is capacity to make a request.
+
+        Args:
+            tokens_needed (int): Number of tokens needed for the request
+
+        Returns:
+            bool: True if capacity is available, False if timeout
+        """
+        start_time = time.time()
+        max_wait_time = 60  # Maximum wait time in seconds
+
+        while time.time() - start_time < max_wait_time:
+            with self.lock:
+                if self.request_tokens >= 1 and self.tokens >= tokens_needed:
+                    # Consume tokens
+                    self.request_tokens -= 1
+                    self.tokens -= tokens_needed
+                    return True
+
+            # Wait before checking again
+            wait_time = 1 + (tokens_needed / self.max_tokens_per_minute) * 10  # Dynamic wait time based on request size
+            logger.debug(f"Waiting {wait_time:.2f}s for API capacity (need {tokens_needed} tokens)")
+            time.sleep(wait_time)
+
+        logger.warning(f"Timeout waiting for API capacity after {max_wait_time}s")
+        return False
+
+    def shutdown(self):
+        """
+        Shutdown the rate limiter.
+        """
+        self.running = False
+        if self.refill_thread.is_alive():
+            self.refill_thread.join(timeout=1)
+
+
+# Create a global rate limiter instance
+_rate_limiter = None
+
+def get_rate_limiter():
+    """
+    Get the rate limiter instance.
+
+    Returns:
+        OpenAIRateLimiter: Rate limiter instance
+    """
+    global _rate_limiter
+    if _rate_limiter is None:
+        # Get rate limits from config or use defaults
+        current_config = get_config()
+        requests_per_minute = getattr(current_config.openai, 'requests_per_minute', 60)
+        max_tokens_per_minute = getattr(current_config.openai, 'max_tokens_per_minute', 90000)
+
+        _rate_limiter = OpenAIRateLimiter(requests_per_minute, max_tokens_per_minute)
+
+    return _rate_limiter
 
 
 def load_metadata_schema():
@@ -383,6 +510,22 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True, 
             # Get model parameters
             model_params = get_model_params()
 
+            # Get rate limiter
+            rate_limiter = get_rate_limiter()
+
+            # Estimate tokens needed for this request
+            # Base tokens for prompt + estimated tokens for image + response tokens
+            prompt_tokens = len(prompt) // 4  # Rough estimate: 4 chars per token
+            image_tokens = 1000 if model_params['image_detail'] == 'low' else 3000  # Rough estimate based on detail level
+            response_tokens = MAX_TOKENS
+            total_tokens_estimate = prompt_tokens + image_tokens + response_tokens
+
+            logger.info(f"Estimated tokens for request: {total_tokens_estimate} (prompt: {prompt_tokens}, image: {image_tokens}, response: {response_tokens})")
+
+            # Wait for capacity before making the request
+            if not rate_limiter.wait_for_capacity(total_tokens_estimate):
+                raise Exception(f"Timeout waiting for API capacity. Try again later.")
+
             # Create OpenAI API request
             response = openai.chat.completions.create(
                 model=model_params['model_name'],
@@ -408,6 +551,10 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True, 
                 max_tokens=MAX_TOKENS,
                 temperature=model_params['temperature']
             )
+
+            # Log actual token usage for future reference
+            if hasattr(response, 'usage') and response.usage:
+                logger.info(f"Actual token usage: {response.usage.total_tokens} (prompt: {response.usage.prompt_tokens}, completion: {response.usage.completion_tokens})")
 
             # Extract and parse JSON response
             result_text = response.choices[0].message.content
@@ -488,64 +635,124 @@ def save_analysis_to_json(analysis, image_path):
         raise
 
 
-def process_photo_with_openai(photo_info, schema):
+def process_photo_with_openai(photo_info, schema, max_retries=3):
     """
     Process a photo with OpenAI API.
     Uses context from similar photos to improve analysis quality.
+    Implements advanced error handling and retry mechanisms.
 
     Args:
         photo_info (dict): Photo information dictionary
         schema (dict): Metadata schema dictionary
+        max_retries (int): Maximum number of retry attempts for the entire process
 
     Returns:
         dict: Processed photo information
     """
-    try:
-        # Get context from similar photos
-        similar_photos_context = get_similar_photos_context(photo_info['local_path'])
-        if similar_photos_context:
-            logger.info(f"Using context from similar photos for: {photo_info['name']}")
+    retry_count = 0
+    last_error = None
+    backoff_time = 1  # Initial backoff time in seconds
 
-            # Prepare custom prompt with context
-            role, instructions_pre, instructions_post, example = get_openai_prompt_settings()
+    while retry_count < max_retries:
+        try:
+            if retry_count > 0:
+                logger.info(f"Retry attempt {retry_count}/{max_retries} for {photo_info['name']} after {backoff_time}s delay")
+                time.sleep(backoff_time)
+                # Exponential backoff with jitter for retries
+                backoff_time = min(30, backoff_time * 2) * (0.8 + 0.4 * random.random())
 
-            # Prepare field descriptions
-            fields_description = prepare_fields_description(schema)
+            # Get context from similar photos
+            similar_photos_context = get_similar_photos_context(photo_info['local_path'])
+            if similar_photos_context:
+                logger.info(f"Using context from similar photos for: {photo_info['name']}")
 
-            # Add context to instructions
-            instructions_pre = f"{instructions_pre}{similar_photos_context}"
+                # Prepare custom prompt with context
+                role, instructions_pre, instructions_post, example = get_openai_prompt_settings()
 
-            # Create custom prompt
-            custom_prompt = f"{role}\n\n{instructions_pre}\n\n{fields_description}\n\n{instructions_post}\n\n{example}"
+                # Prepare field descriptions
+                fields_description = prepare_fields_description(schema)
 
-            # Analyze photo with OpenAI using custom prompt and EXIF data
-            analysis = analyze_photo_with_openai(photo_info['local_path'], schema, use_exif=True, use_custom_prompt=True, custom_prompt=custom_prompt)
-        else:
-            # Analyze photo with OpenAI using EXIF data
-            analysis = analyze_photo_with_openai(photo_info['local_path'], schema, use_exif=True)
+                # Add context to instructions
+                instructions_pre = f"{instructions_pre}{similar_photos_context}"
 
-        # Check if analysis contains an error
-        if 'error' in analysis:
-            logger.error(f"Analysis failed for {photo_info['name']}: {analysis.get('error')}")
-            # Don't save the analysis if it contains an error
-            photo_info['error'] = analysis.get('error')
+                # Create custom prompt
+                custom_prompt = f"{role}\n\n{instructions_pre}\n\n{fields_description}\n\n{instructions_post}\n\n{example}"
+
+                # Analyze photo with OpenAI using custom prompt and EXIF data
+                analysis = analyze_photo_with_openai(photo_info['local_path'], schema, use_exif=True, use_custom_prompt=True, custom_prompt=custom_prompt)
+            else:
+                # Analyze photo with OpenAI using EXIF data
+                analysis = analyze_photo_with_openai(photo_info['local_path'], schema, use_exif=True)
+
+            # Check if analysis contains an error
+            if 'error' in analysis:
+                error_msg = analysis.get('error', '')
+                logger.error(f"Analysis failed for {photo_info['name']}: {error_msg}")
+
+                # Check if this is a retryable error
+                retryable_errors = [
+                    "Failed to parse JSON",
+                    "rate limit",
+                    "timeout",
+                    "connection",
+                    "network",
+                    "server",
+                    "capacity"
+                ]
+
+                if any(err in error_msg.lower() for err in retryable_errors) and retry_count < max_retries - 1:
+                    # This is a retryable error and we have retries left
+                    last_error = error_msg
+                    retry_count += 1
+                    logger.info(f"Retryable error detected, will retry: {error_msg}")
+                    continue
+                else:
+                    # Non-retryable error or out of retries
+                    photo_info['error'] = error_msg
+                    if 'raw_response' in analysis:
+                        photo_info['raw_response'] = analysis['raw_response']
+                    return photo_info
+
+            # Save analysis to JSON
+            analysis_path = save_analysis_to_json(analysis, photo_info['local_path'])
+
+            # Add analysis to photo info
+            photo_info['analysis_path'] = analysis_path
+            photo_info['analysis'] = analysis
+
+            # Log completion
+            logger.info(f"Completed OpenAI analysis for: {photo_info['name']}")
+
             return photo_info
 
-        # Save analysis to JSON
-        analysis_path = save_analysis_to_json(analysis, photo_info['local_path'])
+        except Exception as e:
+            last_error = str(e)
+            logger.error(f"Error processing photo {photo_info['name']} with OpenAI: {last_error}")
 
-        # Add analysis to photo info
-        photo_info['analysis_path'] = analysis_path
-        photo_info['analysis'] = analysis
+            # Check if this is a retryable exception
+            retryable_exceptions = [
+                "rate limit",
+                "timeout",
+                "connection",
+                "network",
+                "server",
+                "capacity",
+                "too many requests"
+            ]
 
-        # Log completion
-        logger.info(f"Completed OpenAI analysis for: {photo_info['name']}")
+            if any(err in last_error.lower() for err in retryable_exceptions) and retry_count < max_retries - 1:
+                # This is a retryable exception and we have retries left
+                retry_count += 1
+                logger.info(f"Retryable exception detected, will retry: {last_error}")
+                continue
+            else:
+                # Non-retryable exception or out of retries
+                photo_info['error'] = last_error
+                return photo_info
 
-        return photo_info
-    except Exception as e:
-        logger.error(f"Error processing photo {photo_info['name']} with OpenAI: {str(e)}")
-        photo_info['error'] = str(e)
-        return photo_info
+    # If we get here, we've exhausted all retries
+    photo_info['error'] = f"Maximum retry attempts ({max_retries}) exceeded. Last error: {last_error}"
+    return photo_info
 
 
 def get_similar_photos_context(photo_path, max_similar=3):
@@ -670,7 +877,11 @@ def process_photos_with_openai(photos, schema):
     if not photos_to_process:
         return skipped_photos
 
-    # Use ThreadPoolExecutor for concurrent processing
+    # Initialize rate limiter
+    rate_limiter = get_rate_limiter()
+    logger.info(f"Using rate limiter with {rate_limiter.requests_per_minute} requests/min and {rate_limiter.max_tokens_per_minute} tokens/min")
+
+    # Use ThreadPoolExecutor for concurrent processing with limited concurrency
     with ThreadPoolExecutor(max_workers=OPENAI_CONCURRENCY_LIMIT) as executor:
         # Submit tasks
         future_to_photo = {executor.submit(process_photo_with_openai, photo, schema): photo for photo in photos_to_process}
@@ -732,6 +943,15 @@ def process_photos_with_openai(photos, schema):
     logger.info(f"Total photos: {len(all_photos)} (processed: {len(processed_photos)}, skipped: {len(skipped_photos)})")
     return all_photos
 
+
+def cleanup_resources():
+    """
+    Clean up resources before exiting.
+    """
+    # Shutdown rate limiter
+    if _rate_limiter is not None:
+        logger.info("Shutting down rate limiter")
+        _rate_limiter.shutdown()
 
 if __name__ == "__main__":
     try:
@@ -809,3 +1029,6 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Error in main process: {str(e)}")
         print(f"Error: {str(e)}")
+    finally:
+        # Clean up resources
+        cleanup_resources()

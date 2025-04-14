@@ -16,6 +16,7 @@
             </div>
             <div class="card-body">
                 <form action="{{ url_for('settings.update_env') }}" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <h6 class="mb-3">SharePoint Settings</h6>
                     <div class="form-group">
                         <label for="SHAREPOINT_SITE_URL">SharePoint Site URL</label>

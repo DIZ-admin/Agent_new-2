@@ -97,11 +97,20 @@ def get_photo_files(ctx, library):
                         'name': file_name,
                         'url': file_url,
                         'size': file_size,
-                        'file_obj': file
+                        'file_obj': file,
+                        'oversized': False
                     })
                     logger.debug(f"Added file to processing list: {file_name}")
                 else:
-                    logger.warning(f"Skipping file {file_name} - exceeds maximum size of {MAX_FILE_SIZE} bytes)")
+                    # Add oversized files with a flag for special handling
+                    photo_files.append({
+                        'name': file_name,
+                        'url': file_url,
+                        'size': file_size,
+                        'file_obj': file,
+                        'oversized': True
+                    })
+                    logger.warning(f"File {file_name} exceeds maximum size of {MAX_FILE_SIZE} bytes. Will be processed with special handling.")
 
         logger.info(f"Found {len(photo_files)} photo files in library")
         return photo_files
@@ -113,6 +122,7 @@ def get_photo_files(ctx, library):
 def download_photo(file_info):
     """
     Download a photo from SharePoint.
+    Handles both normal and oversized files.
 
     Args:
         file_info (dict): File information dictionary
@@ -123,14 +133,53 @@ def download_photo(file_info):
     try:
         file_name = file_info['name']
         file_obj = file_info['file_obj']
+        oversized = file_info.get('oversized', False)
 
         # Create local file path
         local_path = DOWNLOADS_DIR / file_name
 
         # Download file
         logger.info(f"Downloading file: {file_name}")
-        with open(local_path, 'wb') as local_file:
-            file_obj.download(local_file).execute_query()
+
+        if oversized:
+            # For oversized files, use a special handling approach
+            logger.info(f"Using special handling for oversized file: {file_name}")
+            try:
+                # Try to download with streaming to avoid memory issues
+                with open(local_path, 'wb') as local_file:
+                    file_obj.download(local_file).execute_query()
+                logger.info(f"Successfully downloaded oversized file: {file_name}")
+            except Exception as download_error:
+                logger.warning(f"Error downloading oversized file {file_name}: {str(download_error)}")
+                logger.info(f"Attempting to resize the image during download for {file_name}")
+
+                # If direct download fails, try to download and resize on the fly
+                try:
+                    # Create a temporary file for the original
+                    temp_path = DOWNLOADS_DIR / f"temp_{file_name}"
+                    with open(temp_path, 'wb') as temp_file:
+                        file_obj.download(temp_file).execute_query()
+
+                    # Resize the image
+                    with Image.open(temp_path) as img:
+                        # Calculate new dimensions (50% of original)
+                        new_width = img.width // 2
+                        new_height = img.height // 2
+                        resized_img = img.resize((new_width, new_height), Image.LANCZOS)
+
+                        # Save resized image
+                        resized_img.save(local_path, quality=85, optimize=True)
+
+                    # Remove temporary file
+                    os.remove(temp_path)
+                    logger.info(f"Successfully resized and saved oversized file: {file_name}")
+                except Exception as resize_error:
+                    logger.error(f"Failed to resize oversized file {file_name}: {str(resize_error)}")
+                    raise
+        else:
+            # Normal download for regular-sized files
+            with open(local_path, 'wb') as local_file:
+                file_obj.download(local_file).execute_query()
 
         logger.info(f"File downloaded to: {local_path}")
         return local_path

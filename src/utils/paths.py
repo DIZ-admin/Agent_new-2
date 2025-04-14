@@ -392,6 +392,46 @@ def ensure_file_exists(path: Union[str, Path]) -> bool:
     return True
 
 
+def standardize_path(path: Union[str, Path]) -> Path:
+    """
+    Standardize a path to a Path object.
+    This function should be used whenever a path is manipulated to ensure consistency.
+
+    Args:
+        path (Union[str, Path]): Path to standardize
+
+    Returns:
+        Path: Standardized Path object
+    """
+    return Path(path)
+
+
+def copy_file(source: Union[str, Path], target: Union[str, Path]) -> Path:
+    """
+    Copy a file with error handling.
+
+    Args:
+        source (Union[str, Path]): Source path
+        target (Union[str, Path]): Target path
+
+    Returns:
+        Path: Path to the copied file
+
+    Raises:
+        FileNotFoundError: If the source file doesn't exist
+        OSError: If the file cannot be copied
+    """
+    source = Path(source)
+    target = Path(target)
+    logger.debug(f"Copying file from {source} to {target}")
+
+    # Ensure target directory exists
+    target.parent.mkdir(exist_ok=True, parents=True)
+
+    # Copy file
+    return Path(shutil.copy2(source, target))
+
+
 def clean_directory(directory: Union[str, Path]) -> None:
     """
     Remove all files in a directory.

@@ -75,7 +75,7 @@ Dieses Projekt stellt ein automatisiertes System zur Verarbeitung von Fotografie
 **Prozess:**
 1. Das System findet Fotografien im Verzeichnis `/app/data/downloads`
 2. Lädt das Metadatenschema aus der Datei `sharepoint_choices.json`
-3. Lädt den ausgewählten Prompt-Typ aus der entsprechenden Datei in `/app/config/prompts/`
+3. Lädt den ausgewählten Prompt-Typ aus der entsprechenden Datei in `/app/config/`
 4. Für jede Fotografie:
    - Überprüft, ob sie bereits analysiert wurde (nach Dateihash)
    - Extrahiert und formatiert die EXIF-Metadaten

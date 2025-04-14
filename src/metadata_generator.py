@@ -13,7 +13,7 @@ import yaml
 import requests
 
 # Import utilities
-from src.utils.paths import get_path_manager, load_json_file, save_json_file
+from src.utils.paths import get_path_manager, load_json_file, save_json_file, standardize_path, copy_file
 from src.utils.config import get_config
 from src.utils.logging import get_logger
 from src.utils.registry import get_registry
@@ -271,20 +271,87 @@ def generate_metadata_for_upload(photo_info, schema, target_filename):
             title_to_internal_name[field.get('title')] = field.get('internal_name')
 
         # Define priorities for data sources for different fields
+        # This mapping determines which data source has priority for each field
         field_priorities = {
-            'DateTime': ['exif', 'analysis'],  # EXIF has priority for date/time
-            'OrtohnePLZ': ['exif_gps', 'analysis'],  # GPS data has priority for location
-            'Titel': ['analysis', 'exif'],  # Analysis has priority for title
-            'Beschreibung': ['analysis', 'exif'],  # Analysis has priority for description
+            # Date and time fields - EXIF data is more reliable
+            'DateTime': ['exif', 'analysis'],
+            'Datum': ['exif', 'analysis'],
+            'Aufnahmedatum': ['exif', 'analysis'],
+
+            # Location fields - GPS data has priority, then analysis
+            'OrtohnePLZ': ['exif_gps', 'analysis'],
+            'Ort': ['exif_gps', 'analysis'],
+            'Standort': ['exif_gps', 'analysis'],
+            'Location': ['exif_gps', 'analysis'],
+
+            # Description fields - AI analysis is usually better
+            'Titel': ['analysis', 'exif'],
+            'Beschreibung': ['analysis', 'exif'],
+            'Beschreibung_kurz': ['analysis', 'exif'],
+            'Beschreibung_lang': ['analysis', 'exif'],
+            'Title': ['analysis', 'exif'],
+            'Description': ['analysis', 'exif'],
+
+            # Technical fields - EXIF data is more reliable
+            'Kamera': ['exif', 'analysis'],
+            'Objektiv': ['exif', 'analysis'],
+            'Camera': ['exif', 'analysis'],
+            'Lens': ['exif', 'analysis'],
+            'ISO': ['exif', 'analysis'],
+            'Aperture': ['exif', 'analysis'],
+            'ShutterSpeed': ['exif', 'analysis'],
+            'FocalLength': ['exif', 'analysis'],
+
+            # Copyright fields - EXIF data is more reliable
+            'Copyright': ['exif', 'analysis'],
+            'Author': ['exif', 'analysis'],
+            'Autor': ['exif', 'analysis'],
+            'Fotograf': ['exif', 'analysis'],
+            'Photographer': ['exif', 'analysis'],
+
+            # Material and construction fields - AI analysis is better
+            'Material': ['analysis'],
+            'Konstruktion': ['analysis'],
+            'Holzart': ['analysis'],
+            'Bauweise': ['analysis'],
+            'Construction': ['analysis'],
+            'WoodType': ['analysis'],
+            'BuildingType': ['analysis']
         }
 
         # Define mapping between EXIF tags and SharePoint fields
+        # This mapping connects SharePoint field titles to EXIF tag names
         exif_to_sharepoint = {
+            # Date and time fields
             'DateTime': 'DateTimeOriginal',
+            'Datum': 'DateTimeOriginal',
+            'Aufnahmedatum': 'DateTimeOriginal',
+
+            # Author and copyright fields
             'Artist': 'Artist',
+            'Author': 'Artist',
+            'Autor': 'Artist',
+            'Fotograf': 'Artist',
+            'Photographer': 'Artist',
+
             'Copyright': 'Copyright',
+
+            # Description fields
             'Titel': 'ImageDescription',
+            'Title': 'ImageDescription',
             'Beschreibung': 'ImageDescription',
+            'Beschreibung_kurz': 'ImageDescription',
+            'Description': 'ImageDescription',
+
+            # Camera fields
+            'Kamera': 'Make',
+            'Camera': 'Make',
+            'Objektiv': 'LensModel',
+            'Lens': 'LensModel',
+            'ISO': 'ISOSpeedRatings',
+            'Aperture': 'FNumber',
+            'ShutterSpeed': 'ExposureTime',
+            'FocalLength': 'FocalLength'
         }
 
         # Process each field in schema
@@ -343,9 +410,16 @@ def generate_metadata_for_upload(photo_info, schema, target_filename):
                                 logger.debug(f"Using GPS data for field {title}: {value}")
                                 break
             else:
-                # Default to analysis data if no priorities defined
-                if title in analysis:
+                # For fields without explicit priorities, try both sources
+                # First check if there's a matching EXIF field
+                exif_field = exif_to_sharepoint.get(title)
+                if exif_field and exif_field in exif_metadata:
+                    value = exif_metadata[exif_field]
+                    logger.debug(f"Using EXIF data for field without priority {title}: {value}")
+                # Then check if there's a matching analysis field
+                elif title in analysis:
                     value = analysis[title]
+                    logger.debug(f"Using analysis data for field without priority {title}: {value}")
 
             # Validate and add value if available
             if value is not None:
@@ -424,15 +498,14 @@ def prepare_photo_for_upload(photo_info, schema, file_number):
         original_metadata_path = None
         if photo_info.get('metadata_path'):
             base_name = os.path.splitext(target_filename)[0]
-            original_metadata_target_path = os.path.join(UPLOAD_METADATA_DIR, f"{base_name}.yml")
-            shutil.copy2(photo_info['metadata_path'], original_metadata_target_path)
+            original_metadata_target_path = UPLOAD_METADATA_DIR / f"{base_name}.yml"
+            copy_file(standardize_path(photo_info['metadata_path']), original_metadata_target_path)
             original_metadata_path = original_metadata_target_path
             logger.info(f"Copied original metadata to upload directory: {original_metadata_target_path}")
 
         # Copy photo to upload directory
-        target_path = os.path.join(UPLOAD_DIR, target_filename)
-        with open(photo_info['local_path'], 'rb') as src, open(target_path, 'wb') as dst:
-            dst.write(src.read())
+        target_path = UPLOAD_DIR / target_filename
+        copy_file(standardize_path(photo_info['local_path']), target_path)
 
         logger.info(f"Copied photo to upload directory: {target_path}")
 
