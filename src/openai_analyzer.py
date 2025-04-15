@@ -99,6 +99,78 @@ def get_model_params():
 # Metadata schema file
 METADATA_SCHEMA_FILE = config.file.metadata_schema_file
 
+# Global prompt cache
+_prompt_cache = {}
+
+
+def get_cached_prompt(schema, use_exif=False, image_path=None, custom_prompt=None):
+    """
+    Get a cached prompt or generate a new one if not in cache.
+
+    Args:
+        schema (dict): Metadata schema dictionary
+        use_exif (bool): Whether to include EXIF data in the prompt
+        image_path (str, optional): Path to image file (required if use_exif=True)
+        custom_prompt (str, optional): Custom prompt to use instead of generating one
+
+    Returns:
+        str: Cached or newly generated prompt
+    """
+    global _prompt_cache
+
+    # If custom prompt is provided, don't use cache
+    if custom_prompt:
+        logger.debug("Using custom prompt, bypassing cache")
+        return custom_prompt
+
+    # Create cache key
+    prompt_type = get_prompt_type()
+    cache_key = f"{prompt_type}_{use_exif}"
+
+    # For EXIF prompts, we need to include the image path in the cache key
+    # since EXIF data is specific to each image
+    if use_exif and image_path:
+        # Use image hash or modification time as part of the key
+        try:
+            # Use modification time as a simple cache key component
+            mod_time = os.path.getmtime(image_path)
+            cache_key = f"{cache_key}_{os.path.basename(image_path)}_{mod_time}"
+        except Exception as e:
+            logger.warning(f"Error getting image modification time for cache key: {str(e)}")
+            # Fall back to just the image path
+            cache_key = f"{cache_key}_{os.path.basename(image_path)}"
+
+    # Check if prompt is in cache
+    if cache_key in _prompt_cache:
+        logger.info(f"Using cached prompt for {cache_key}")
+        return _prompt_cache[cache_key]
+
+    # Generate new prompt
+    try:
+        if use_exif and image_path:
+            # Generate prompt with EXIF data
+            prompt = prepare_openai_prompt_with_exif(schema, image_path)
+            logger.info(f"Generated new prompt with EXIF data for {os.path.basename(image_path)}")
+        else:
+            # Generate standard prompt
+            prompt = prepare_openai_prompt(schema)
+            logger.info("Generated new standard prompt")
+
+        # Cache the prompt
+        _prompt_cache[cache_key] = prompt
+
+        # Log cache statistics
+        logger.debug(f"Prompt cache now contains {len(_prompt_cache)} entries")
+
+        return prompt
+    except Exception as e:
+        logger.error(f"Error generating prompt for cache: {str(e)}")
+        # If there's an error, generate the prompt without caching
+        if use_exif and image_path:
+            return prepare_openai_prompt_with_exif(schema, image_path)
+        else:
+            return prepare_openai_prompt(schema)
+
 
 def get_prompt_type():
     """
@@ -879,15 +951,20 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True, 
         try:
             logger.info(f"Analyzing photo: {os.path.basename(image_path)} (Attempt {retry_count + 1}/{max_retries})")
 
-            # Determine which prompt to use
+            # Get prompt from cache or generate a new one
+            prompt = get_cached_prompt(
+                schema=schema,
+                use_exif=use_exif,
+                image_path=image_path if use_exif else None,
+                custom_prompt=custom_prompt if use_custom_prompt else None
+            )
+
+            # Log which type of prompt is being used
             if use_custom_prompt and custom_prompt:
-                prompt = custom_prompt
                 logger.info(f"Using custom prompt for {os.path.basename(image_path)}")
             elif use_exif:
-                prompt = prepare_openai_prompt_with_exif(schema, image_path)
                 logger.info(f"Using prompt with EXIF data for {os.path.basename(image_path)}")
             else:
-                prompt = prepare_openai_prompt(schema)
                 logger.info(f"Using standard prompt for {os.path.basename(image_path)}")
 
             # Encode image to base64
@@ -1166,17 +1243,31 @@ def process_photo_with_openai(photo_info, schema, max_retries=3):
             if similar_photos_context:
                 logger.info(f"Using context from similar photos for: {photo_info['name']}")
 
-                # Prepare custom prompt with context
-                role, instructions_pre, instructions_post, example = get_openai_prompt_settings()
+                # Create a cache key for this context
+                context_hash = hash(similar_photos_context)
+                cache_key = f"context_{context_hash}_{get_prompt_type()}"
 
-                # Prepare field descriptions
-                fields_description = prepare_fields_description(schema)
+                # Check if we have a cached prompt with this context
+                global _prompt_cache
+                if cache_key in _prompt_cache:
+                    logger.info(f"Using cached context prompt for {photo_info['name']}")
+                    custom_prompt = _prompt_cache[cache_key]
+                else:
+                    # Prepare custom prompt with context
+                    role, instructions_pre, instructions_post, example = get_openai_prompt_settings()
 
-                # Add context to instructions
-                instructions_pre = f"{instructions_pre}{similar_photos_context}"
+                    # Prepare field descriptions
+                    fields_description = prepare_fields_description(schema)
 
-                # Create custom prompt
-                custom_prompt = f"{role}\n\n{instructions_pre}\n\n{fields_description}\n\n{instructions_post}\n\n{example}"
+                    # Add context to instructions
+                    instructions_pre = f"{instructions_pre}{similar_photos_context}"
+
+                    # Create custom prompt
+                    custom_prompt = f"{role}\n\n{instructions_pre}\n\n{fields_description}\n\n{instructions_post}\n\n{example}"
+
+                    # Cache this context prompt
+                    _prompt_cache[cache_key] = custom_prompt
+                    logger.info(f"Cached new context prompt for {photo_info['name']}")
 
                 # Analyze photo with OpenAI using custom prompt and EXIF data
                 analysis = analyze_photo_with_openai(photo_info['local_path'], schema, use_exif=True, use_custom_prompt=True, custom_prompt=custom_prompt)
@@ -1222,6 +1313,11 @@ def process_photo_with_openai(photo_info, schema, max_retries=3):
 
             # Log completion
             logger.info(f"Completed OpenAI analysis for: {photo_info['name']}")
+
+            # Trim prompt cache if it's getting too large
+            # This helps prevent memory issues during batch processing
+            if len(_prompt_cache) > 100:
+                trim_prompt_cache(50)
 
             return photo_info
 
@@ -1385,10 +1481,16 @@ def process_photos_with_openai(photos, schema):
         # Submit tasks
         future_to_photo = {executor.submit(process_photo_with_openai, photo, schema): photo for photo in photos_to_process}
 
+        # Track completed photos for cache management
+        completed_count = 0
+
         # Process results as they complete
         for future in future_to_photo:
             try:
                 processed_photo = future.result()
+
+                # Increment completed count
+                completed_count += 1
 
                 # Check if the photo has an error
                 if 'error' in processed_photo:
@@ -1404,17 +1506,30 @@ def process_photos_with_openai(photos, schema):
                     # No error, add to processed_photos and register the hash
                     processed_photos.append(processed_photo)
 
-                    # Register the file hash if analysis was successful
-                    if 'local_path' in processed_photo and 'analysis_path' in processed_photo:
-                        registry.register_file_hash(processed_photo['local_path'], {
-                            'analysis_path': str(processed_photo['analysis_path']),
-                            'timestamp': datetime.now().isoformat()
-                        })
+                # Periodically trim the cache to prevent memory issues
+                # Do this every 5 photos or when cache gets too large
+                if completed_count % 5 == 0 or len(_prompt_cache) > 100:
+                    cache_stats = get_prompt_cache_stats()
+                    logger.info(f"Prompt cache stats: {cache_stats['cache_entries']} entries, {cache_stats['total_size_kb']:.2f} KB")
+                    trim_prompt_cache(50)
+
+                # Register the file hash if analysis was successful
+                if 'local_path' in processed_photo and 'analysis_path' in processed_photo:
+                    registry.register_file_hash(processed_photo['local_path'], {
+                        'analysis_path': str(processed_photo['analysis_path']),
+                        'timestamp': datetime.now().isoformat()
+                    })
             except Exception as e:
                 photo = future_to_photo[future]
                 logger.error(f"Error in OpenAI analysis for {photo['name']}: {str(e)}")
                 photo['error'] = str(e)
                 processed_photos.append(photo)
+
+    # Clear prompt cache after processing batch to free up memory
+    if len(_prompt_cache) > 0:
+        cache_stats = get_prompt_cache_stats()
+        logger.info(f"Clearing prompt cache after batch processing: {cache_stats['cache_entries']} entries, {cache_stats['total_size_kb']:.2f} KB")
+        clear_prompt_cache()
 
     # Retry failed photos (those with JSON parsing errors)
     if failed_photos:
@@ -1443,6 +1558,77 @@ def process_photos_with_openai(photos, schema):
     return all_photos
 
 
+def clear_prompt_cache():
+    """
+    Clear the prompt cache to free up memory.
+
+    Returns:
+        int: Number of cache entries cleared
+    """
+    global _prompt_cache
+    cache_size = len(_prompt_cache)
+    _prompt_cache.clear()
+    logger.info(f"Cleared prompt cache ({cache_size} entries)")
+    return cache_size
+
+
+def trim_prompt_cache(max_size=50):
+    """
+    Trim the prompt cache to the specified maximum size.
+    Removes the oldest entries first.
+
+    Args:
+        max_size (int): Maximum number of entries to keep in the cache
+
+    Returns:
+        int: Number of cache entries removed
+    """
+    global _prompt_cache
+    if len(_prompt_cache) <= max_size:
+        return 0
+
+    # Get all cache keys sorted by when they were added (oldest first)
+    # Since we don't track addition time, we'll just use the current order
+    cache_keys = list(_prompt_cache.keys())
+
+    # Calculate how many entries to remove
+    entries_to_remove = len(cache_keys) - max_size
+
+    # Remove oldest entries
+    for key in cache_keys[:entries_to_remove]:
+        del _prompt_cache[key]
+
+    logger.info(f"Trimmed prompt cache, removed {entries_to_remove} oldest entries")
+    return entries_to_remove
+
+
+def get_prompt_cache_stats():
+    """
+    Get statistics about the prompt cache.
+
+    Returns:
+        dict: Cache statistics
+    """
+    global _prompt_cache
+
+    # Calculate total size of cached prompts
+    total_size = sum(len(prompt) for prompt in _prompt_cache.values())
+
+    # Count different types of prompts
+    standard_prompts = sum(1 for key in _prompt_cache if "_False" in key)
+    exif_prompts = sum(1 for key in _prompt_cache if "_True" in key)
+    context_prompts = sum(1 for key in _prompt_cache if key.startswith("context_"))
+
+    return {
+        "cache_entries": len(_prompt_cache),
+        "total_size_bytes": total_size,
+        "total_size_kb": total_size / 1024,
+        "standard_prompts": standard_prompts,
+        "exif_prompts": exif_prompts,
+        "context_prompts": context_prompts
+    }
+
+
 def cleanup_resources():
     """
     Clean up resources before exiting.
@@ -1451,6 +1637,11 @@ def cleanup_resources():
     if _rate_limiter is not None:
         logger.info("Shutting down rate limiter")
         _rate_limiter.shutdown()
+
+    # Clear prompt cache
+    if len(_prompt_cache) > 0:
+        logger.info(f"Clearing prompt cache with {len(_prompt_cache)} entries")
+        clear_prompt_cache()
 
 if __name__ == "__main__":
     try:
