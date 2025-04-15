@@ -40,14 +40,22 @@ MAX_TOKENS = config.openai.max_tokens
 
 # Get model parameters from environment or config
 def get_model_params():
-    """Get model parameters from environment or config."""
+    """
+    Get model parameters from environment or config.
+
+    Available multimodal models that support image analysis:
+    - gpt-4o: Primary multimodal model with vision capabilities
+    - gpt-4o-mini: Lighter version of GPT-4o with vision capabilities
+    - gpt-4-turbo: Updated version of GPT-4 with vision capabilities
+    - o1: Advanced reasoning model with vision capabilities
+    """
     # Get current config
     current_config = get_config()
 
     # Get model name
     model_name = os.environ.get('MODEL_NAME', '')
     if not model_name:
-        model_name = getattr(current_config.openai, 'model_name', 'gpt-4-vision-preview')
+        model_name = getattr(current_config.openai, 'model_name', 'gpt-4o')
 
     # Get temperature
     temperature_str = os.environ.get('TEMPERATURE', '')
@@ -803,6 +811,8 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True, 
                 raise Exception(f"Timeout waiting for API capacity. Try again later.")
 
             # Create OpenAI API request
+            # Using multimodal model to analyze the image
+            # Supported models: gpt-4o, gpt-4o-mini, gpt-4-turbo, o1
             response = openai.chat.completions.create(
                 model=model_params['model_name'],
                 messages=[
