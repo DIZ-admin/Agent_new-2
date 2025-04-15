@@ -180,6 +180,7 @@ class OpenAIRateLimiter:
     """
     Rate limiter for OpenAI API requests to avoid hitting rate limits.
     Implements a token bucket algorithm for rate limiting.
+    Also tracks total token usage for monitoring and reporting.
     """
 
     def __init__(self, requests_per_minute=60, max_tokens_per_minute=90000):
@@ -215,6 +216,28 @@ class OpenAIRateLimiter:
 
         # Queue for pending requests
         self.request_queue = queue.Queue()
+
+        # Token usage tracking
+        self.total_prompt_tokens = 0
+        self.total_completion_tokens = 0
+        self.total_tokens = 0
+        self.request_count = 0
+        self.error_count = 0
+        self.start_time = time.time()
+
+        # Token usage by model
+        self.model_usage = {}
+
+        # Token usage history (last 24 hours in 10-minute intervals)
+        self.usage_history = []
+        self.last_history_update = time.time()
+        self.history_interval = 600  # 10 minutes in seconds
+
+        # Path for saving token usage statistics (in logs directory for better container sharing)
+        self.stats_file = os.path.join(get_path_manager().logs_dir, 'token_usage_stats.json')
+
+        # Load existing statistics if available
+        self._load_stats()
 
         logger.info(f"OpenAI rate limiter initialized with {requests_per_minute} requests/min and {max_tokens_per_minute} tokens/min")
 
@@ -269,10 +292,189 @@ class OpenAIRateLimiter:
         logger.warning(f"Timeout waiting for API capacity after {max_wait_time}s")
         return False
 
+    def update_token_usage(self, prompt_tokens, completion_tokens, model_name):
+        """
+        Update token usage statistics.
+
+        Args:
+            prompt_tokens (int): Number of tokens in the prompt
+            completion_tokens (int): Number of tokens in the completion
+            model_name (str): Name of the model used
+        """
+        with self.lock:
+            # Update total counts
+            self.total_prompt_tokens += prompt_tokens
+            self.total_completion_tokens += completion_tokens
+            self.total_tokens += prompt_tokens + completion_tokens
+            self.request_count += 1
+
+            # Update model-specific usage
+            if model_name not in self.model_usage:
+                self.model_usage[model_name] = {
+                    'prompt_tokens': 0,
+                    'completion_tokens': 0,
+                    'total_tokens': 0,
+                    'request_count': 0
+                }
+
+            self.model_usage[model_name]['prompt_tokens'] += prompt_tokens
+            self.model_usage[model_name]['completion_tokens'] += completion_tokens
+            self.model_usage[model_name]['total_tokens'] += prompt_tokens + completion_tokens
+            self.model_usage[model_name]['request_count'] += 1
+
+            # Update usage history if needed
+            current_time = time.time()
+            if current_time - self.last_history_update >= self.history_interval:
+                # Add current usage to history
+                self.usage_history.append({
+                    'timestamp': current_time,
+                    'prompt_tokens': prompt_tokens,
+                    'completion_tokens': completion_tokens,
+                    'total_tokens': prompt_tokens + completion_tokens,
+                    'model_name': model_name
+                })
+
+                # Keep only last 24 hours (144 entries at 10-minute intervals)
+                one_day_ago = current_time - 86400  # 24 hours in seconds
+                self.usage_history = [entry for entry in self.usage_history if entry['timestamp'] > one_day_ago]
+
+                # Update last history update time
+                self.last_history_update = current_time
+
+            # Save statistics periodically (every 10 requests or after large requests)
+            if self.request_count % 10 == 0 or prompt_tokens + completion_tokens > 1000:
+                self._save_stats()
+
+    def record_error(self, error_type=None):
+        """
+        Record an API error.
+
+        Args:
+            error_type (str, optional): Type of error
+        """
+        with self.lock:
+            self.error_count += 1
+
+            # Save statistics after recording an error
+            self._save_stats()
+
+    def get_token_usage_stats(self):
+        """
+        Get token usage statistics.
+
+        Returns:
+            dict: Token usage statistics
+        """
+        with self.lock:
+            # Calculate time-based metrics
+            current_time = time.time()
+            elapsed_time = current_time - self.start_time
+            elapsed_minutes = elapsed_time / 60
+
+            # Calculate rates
+            tokens_per_minute = self.total_tokens / elapsed_minutes if elapsed_minutes > 0 else 0
+            requests_per_minute = self.request_count / elapsed_minutes if elapsed_minutes > 0 else 0
+
+            # Calculate current usage percentages
+            token_usage_percent = (self.max_tokens_per_minute - self.tokens) / self.max_tokens_per_minute * 100
+            request_usage_percent = (self.max_request_tokens - self.request_tokens) / self.max_request_tokens * 100
+
+            return {
+                'total_prompt_tokens': self.total_prompt_tokens,
+                'total_completion_tokens': self.total_completion_tokens,
+                'total_tokens': self.total_tokens,
+                'request_count': self.request_count,
+                'error_count': self.error_count,
+                'tokens_per_minute': tokens_per_minute,
+                'requests_per_minute': requests_per_minute,
+                'token_usage_percent': token_usage_percent,
+                'request_usage_percent': request_usage_percent,
+                'model_usage': self.model_usage,
+                'elapsed_time': elapsed_time,
+                'elapsed_minutes': elapsed_minutes,
+                'start_time': self.start_time,
+                'current_time': current_time
+            }
+
+    def get_usage_history(self):
+        """
+        Get token usage history.
+
+        Returns:
+            list: Token usage history
+        """
+        with self.lock:
+            return self.usage_history.copy()
+
+    def _load_stats(self):
+        """
+        Load token usage statistics from file if available.
+        """
+        try:
+            if os.path.exists(self.stats_file):
+                logger.info(f"Found token usage statistics file at {self.stats_file}")
+                with open(self.stats_file, 'r', encoding='utf-8') as f:
+                    stats = json.load(f)
+
+                    # Load basic statistics
+                    self.total_prompt_tokens = stats.get('total_prompt_tokens', 0)
+                    self.total_completion_tokens = stats.get('total_completion_tokens', 0)
+                    self.total_tokens = stats.get('total_tokens', 0)
+                    self.request_count = stats.get('request_count', 0)
+                    self.error_count = stats.get('error_count', 0)
+
+                    # Only update start_time if it's older than current
+                    saved_start_time = stats.get('start_time', 0)
+                    if saved_start_time < self.start_time:
+                        self.start_time = saved_start_time
+
+                    # Load model usage
+                    self.model_usage = stats.get('model_usage', {})
+
+                    # Load usage history
+                    self.usage_history = stats.get('usage_history', [])
+
+                    logger.info(f"Successfully loaded token usage statistics from {self.stats_file}")
+                    logger.info(f"Total tokens: {self.total_tokens}, Requests: {self.request_count}, Models: {list(self.model_usage.keys())}")
+            else:
+                logger.info(f"No token usage statistics file found at {self.stats_file}, starting with empty stats")
+        except Exception as e:
+            logger.error(f"Error loading token usage statistics: {str(e)}")
+
+    def _save_stats(self):
+        """
+        Save token usage statistics to file.
+        """
+        try:
+            stats = {
+                'total_prompt_tokens': self.total_prompt_tokens,
+                'total_completion_tokens': self.total_completion_tokens,
+                'total_tokens': self.total_tokens,
+                'request_count': self.request_count,
+                'error_count': self.error_count,
+                'start_time': self.start_time,
+                'last_update': time.time(),
+                'model_usage': self.model_usage,
+                'usage_history': self.usage_history
+            }
+
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(self.stats_file), exist_ok=True)
+
+            with open(self.stats_file, 'w', encoding='utf-8') as f:
+                json.dump(stats, f, indent=2)
+
+            logger.info(f"Saved token usage statistics to {self.stats_file} (total tokens: {self.total_tokens}, requests: {self.request_count})")
+        except Exception as e:
+            logger.error(f"Error saving token usage statistics: {str(e)}")
+
     def shutdown(self):
         """
         Shutdown the rate limiter.
         """
+        # Save statistics before shutting down
+        self._save_stats()
+
         self.running = False
         if self.refill_thread.is_alive():
             self.refill_thread.join(timeout=1)
@@ -298,6 +500,80 @@ def get_rate_limiter():
         _rate_limiter = OpenAIRateLimiter(requests_per_minute, max_tokens_per_minute)
 
     return _rate_limiter
+
+
+def get_token_usage_stats():
+    """
+    Get token usage statistics from the rate limiter or directly from the stats file.
+
+    Returns:
+        dict: Token usage statistics or None if rate limiter is not initialized and stats file doesn't exist
+    """
+    # Try to get stats from rate limiter first
+    rate_limiter = get_rate_limiter()
+    if rate_limiter:
+        return rate_limiter.get_token_usage_stats()
+
+    # If rate limiter is not available, try to read stats directly from file
+    try:
+        stats_file = os.path.join(get_path_manager().logs_dir, 'token_usage_stats.json')
+        if os.path.exists(stats_file):
+            with open(stats_file, 'r', encoding='utf-8') as f:
+                stats = json.load(f)
+
+                # Calculate time-based metrics
+                current_time = time.time()
+                elapsed_time = current_time - stats.get('start_time', current_time)
+                elapsed_minutes = elapsed_time / 60
+
+                # Calculate rates
+                tokens_per_minute = stats.get('total_tokens', 0) / elapsed_minutes if elapsed_minutes > 0 else 0
+                requests_per_minute = stats.get('request_count', 0) / elapsed_minutes if elapsed_minutes > 0 else 0
+
+                # Add calculated metrics to stats
+                stats.update({
+                    'tokens_per_minute': tokens_per_minute,
+                    'requests_per_minute': requests_per_minute,
+                    'token_usage_percent': 0.0,  # Not available when reading directly from file
+                    'request_usage_percent': 0.0,  # Not available when reading directly from file
+                    'elapsed_time': elapsed_time,
+                    'elapsed_minutes': elapsed_minutes,
+                    'current_time': current_time
+                })
+
+                logger.info(f"Loaded token usage statistics directly from {stats_file}")
+                return stats
+    except Exception as e:
+        logger.error(f"Error loading token usage statistics from file: {str(e)}")
+
+    return None
+
+
+def get_token_usage_history():
+    """
+    Get token usage history from the rate limiter or directly from the stats file.
+
+    Returns:
+        list: Token usage history or empty list if rate limiter is not initialized and stats file doesn't exist
+    """
+    # Try to get history from rate limiter first
+    rate_limiter = get_rate_limiter()
+    if rate_limiter:
+        return rate_limiter.get_usage_history()
+
+    # If rate limiter is not available, try to read history directly from file
+    try:
+        stats_file = os.path.join(get_path_manager().logs_dir, 'token_usage_stats.json')
+        if os.path.exists(stats_file):
+            with open(stats_file, 'r', encoding='utf-8') as f:
+                stats = json.load(f)
+                history = stats.get('usage_history', [])
+                logger.info(f"Loaded token usage history directly from {stats_file}")
+                return history
+    except Exception as e:
+        logger.error(f"Error loading token usage history from file: {str(e)}")
+
+    return []
 
 
 def load_metadata_schema():
@@ -552,9 +828,17 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True, 
                 temperature=model_params['temperature']
             )
 
-            # Log actual token usage for future reference
+            # Log and track actual token usage
             if hasattr(response, 'usage') and response.usage:
-                logger.info(f"Actual token usage: {response.usage.total_tokens} (prompt: {response.usage.prompt_tokens}, completion: {response.usage.completion_tokens})")
+                prompt_tokens = response.usage.prompt_tokens
+                completion_tokens = response.usage.completion_tokens
+                total_tokens = response.usage.total_tokens
+
+                # Log token usage
+                logger.info(f"Actual token usage: {total_tokens} (prompt: {prompt_tokens}, completion: {completion_tokens})")
+
+                # Update token usage statistics
+                rate_limiter.update_token_usage(prompt_tokens, completion_tokens, model_params['model_name'])
 
             # Extract and parse JSON response
             result_text = response.choices[0].message.content
@@ -591,18 +875,33 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True, 
                 continue
 
         except Exception as e:
-            logger.error(f"Error analyzing photo {os.path.basename(image_path)}: {str(e)}")
+            error_msg = str(e)
+            logger.error(f"Error analyzing photo {os.path.basename(image_path)}: {error_msg}")
+
+            # Record the error in rate limiter statistics
+            rate_limiter.record_error(error_type="API Error")
+
+            # Check if this is a rate limit error
+            is_rate_limit_error = "rate limit" in error_msg.lower()
+            if is_rate_limit_error:
+                # Extract wait time from error message if available
+                wait_time_match = re.search(r'try again in (\d+\.?\d*)s', error_msg.lower())
+                wait_time = float(wait_time_match.group(1)) if wait_time_match else 5
+
+                logger.warning(f"Rate limit exceeded. Waiting {wait_time} seconds before retry.")
+                time.sleep(wait_time + 1)  # Add 1 second buffer
 
             # If this is the last retry, return the error
             if retry_count == max_retries - 1:
-                return {"error": str(e)}
+                return {"error": error_msg}
 
             # Otherwise, increment retry count and try again
             retry_count += 1
-            logger.info(f"Retrying analysis for {os.path.basename(image_path)}...")
+            logger.info(f"Retrying analysis for {os.path.basename(image_path)}... (Attempt {retry_count + 1}/{max_retries})")
 
-            # Add a small delay before retrying to avoid rate limits
-            time.sleep(2)
+            # Add a small delay before retrying to avoid rate limits if not already waiting
+            if not is_rate_limit_error:
+                time.sleep(2)
             continue
 
     # This should not be reached, but just in case

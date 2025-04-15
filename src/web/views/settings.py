@@ -15,6 +15,7 @@ from src.utils.logging import get_logger
 from src.utils.paths import get_path_manager
 from src.web.file_cache import get_file_cache
 from src.utils.registry import get_registry
+from src.openai_analyzer import get_token_usage_stats, get_token_usage_history
 
 # Get logger
 logger = get_logger('web.settings')
@@ -402,9 +403,9 @@ def clear_cache():
         # Clear the cache
         file_cache.clear()
 
-        # Get registry and reload it
+        # Get registry and clear it
         registry = get_registry()
-        registry.reload()
+        registry.clear_registries()  # Clear registries instead of just reloading
 
         flash("Cache and registry cleared successfully", "success")
         logger.info("Cache and registry cleared via web interface")
@@ -446,16 +447,51 @@ def clean_all_data():
             logger.info(f"Cleaned {count} files from {dir_name} directory")
             total_count += count
 
-        # Clear the cache and reload registry
+        # Clear the cache and registry
         file_cache = get_file_cache()
         file_cache.clear()
         registry = get_registry()
-        registry.reload()
+        registry.clear_registries()  # Clear registries instead of just reloading
 
         flash(f"Successfully cleaned {total_count} files from all data directories", "success")
         logger.info(f"Cleaned {total_count} files from all data directories via web interface")
     except Exception as e:
         flash(f"Error cleaning all data: {str(e)}", "danger")
         logger.error(f"Error cleaning all data: {str(e)}")
+
+    return redirect(url_for('settings.index'))
+
+
+@bp.route('/token_usage')
+def token_usage():
+    """Get token usage statistics."""
+    try:
+        # Get token usage statistics
+        stats = get_token_usage_stats()
+        history = get_token_usage_history()
+
+        if stats:
+            # Format timestamps for better readability
+            stats['start_time_formatted'] = datetime.fromtimestamp(stats['start_time']).strftime('%Y-%m-%d %H:%M:%S')
+            stats['current_time_formatted'] = datetime.fromtimestamp(stats['current_time']).strftime('%Y-%m-%d %H:%M:%S')
+
+            # Format rates for better readability
+            stats['tokens_per_minute_formatted'] = f"{stats['tokens_per_minute']:.2f}"
+            stats['requests_per_minute_formatted'] = f"{stats['requests_per_minute']:.2f}"
+
+            # Format percentages for better readability
+            stats['token_usage_percent_formatted'] = f"{stats['token_usage_percent']:.2f}%"
+            stats['request_usage_percent_formatted'] = f"{stats['request_usage_percent']:.2f}%"
+
+            # Format history timestamps
+            for entry in history:
+                entry['timestamp_formatted'] = datetime.fromtimestamp(entry['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
+
+            return render_template('settings/token_usage.html', stats=stats, history=history)
+        else:
+            flash("No token usage statistics available", "warning")
+    except Exception as e:
+        logger.error(f"Error getting token usage statistics: {str(e)}")
+        flash(f"Error getting token usage statistics: {str(e)}", "danger")
 
     return redirect(url_for('settings.index'))

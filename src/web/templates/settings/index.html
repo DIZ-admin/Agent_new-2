@@ -234,6 +234,18 @@
 
         <div class="card mb-4">
             <div class="card-header">
+                <h5><i class="fas fa-chart-line"></i> OpenAI Token Usage</h5>
+            </div>
+            <div class="card-body">
+                <p>View detailed statistics about OpenAI API token usage.</p>
+                <a href="{{ url_for('settings.token_usage') }}" class="btn btn-primary">
+                    <i class="fas fa-chart-bar"></i> View Token Usage Statistics
+                </a>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
                 <h5><i class="fas fa-info-circle"></i> System Information</h5>
             </div>
             <div class="card-body">

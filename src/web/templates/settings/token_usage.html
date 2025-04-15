@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+
+{% block title %}Token Usage Statistics{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>OpenAI Token Usage Statistics</h1>
+    
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Summary</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <tbody>
+                            <tr>
+                                <th>Total Tokens</th>
+                                <td>{{ stats.total_tokens }}</td>
+                            </tr>
+                            <tr>
+                                <th>Prompt Tokens</th>
+                                <td>{{ stats.total_prompt_tokens }}</td>
+                            </tr>
+                            <tr>
+                                <th>Completion Tokens</th>
+                                <td>{{ stats.total_completion_tokens }}</td>
+                            </tr>
+                            <tr>
+                                <th>Total Requests</th>
+                                <td>{{ stats.request_count }}</td>
+                            </tr>
+                            <tr>
+                                <th>Error Count</th>
+                                <td>{{ stats.error_count }}</td>
+                            </tr>
+                            <tr>
+                                <th>Tokens per Minute</th>
+                                <td>{{ stats.tokens_per_minute_formatted }}</td>
+                            </tr>
+                            <tr>
+                                <th>Requests per Minute</th>
+                                <td>{{ stats.requests_per_minute_formatted }}</td>
+                            </tr>
+                            <tr>
+                                <th>Current Token Usage</th>
+                                <td>{{ stats.token_usage_percent_formatted }}</td>
+                            </tr>
+                            <tr>
+                                <th>Current Request Usage</th>
+                                <td>{{ stats.request_usage_percent_formatted }}</td>
+                            </tr>
+                            <tr>
+                                <th>Start Time</th>
+                                <td>{{ stats.start_time_formatted }}</td>
+                            </tr>
+                            <tr>
+                                <th>Current Time</th>
+                                <td>{{ stats.current_time_formatted }}</td>
+                            </tr>
+                            <tr>
+                                <th>Elapsed Time</th>
+                                <td>{{ stats.elapsed_minutes|round(1) }} minutes</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">Model Usage</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Model</th>
+                                <th>Requests</th>
+                                <th>Total Tokens</th>
+                                <th>Prompt Tokens</th>
+                                <th>Completion Tokens</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for model_name, usage in stats.model_usage.items() %}
+                            <tr>
+                                <td>{{ model_name }}</td>
+                                <td>{{ usage.request_count }}</td>
+                                <td>{{ usage.total_tokens }}</td>
+                                <td>{{ usage.prompt_tokens }}</td>
+                                <td>{{ usage.completion_tokens }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% if history %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">Usage History</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Model</th>
+                                <th>Total Tokens</th>
+                                <th>Prompt Tokens</th>
+                                <th>Completion Tokens</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entry in history %}
+                            <tr>
+                                <td>{{ entry.timestamp_formatted }}</td>
+                                <td>{{ entry.model_name }}</td>
+                                <td>{{ entry.total_tokens }}</td>
+                                <td>{{ entry.prompt_tokens }}</td>
+                                <td>{{ entry.completion_tokens }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="row mt-4 mb-4">
+        <div class="col-12">
+            <a href="{{ url_for('settings.index') }}" class="btn btn-secondary">Back to Settings</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
