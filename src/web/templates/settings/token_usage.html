@@ -5,7 +5,7 @@
 {% block content %}
 <div class="container mt-4">
     <h1>OpenAI Token Usage Statistics</h1>
-    
+
     <div class="row mt-4">
         <div class="col-md-6">
             <div class="card">
@@ -68,7 +68,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="col-md-6">
             <div class="card">
                 <div class="card-header bg-success text-white">
@@ -101,7 +101,7 @@
             </div>
         </div>
     </div>
-    
+
     {% if history %}
     <div class="row mt-4">
         <div class="col-12">
@@ -137,9 +137,10 @@
         </div>
     </div>
     {% endif %}
-    
+
     <div class="row mt-4 mb-4">
         <div class="col-12">
+            <a href="{{ url_for('settings.token_usage') }}" class="btn btn-primary me-2"><i class="fas fa-sync-alt"></i> Refresh Statistics</a>
             <a href="{{ url_for('settings.index') }}" class="btn btn-secondary">Back to Settings</a>
         </div>
     </div>

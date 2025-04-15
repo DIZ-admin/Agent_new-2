@@ -57,13 +57,6 @@ def get_model_params():
     if not model_name:
         model_name = getattr(current_config.openai, 'model_name', 'gpt-4o')
 
-    # Get temperature
-    temperature_str = os.environ.get('TEMPERATURE', '')
-    try:
-        temperature = float(temperature_str) if temperature_str else 0.5
-    except ValueError:
-        temperature = 0.5
-
     # Get image detail level
     image_detail = os.environ.get('IMAGE_DETAIL', '')
     if not image_detail:
@@ -73,9 +66,11 @@ def get_model_params():
     if image_detail not in ['auto', 'low', 'high']:
         image_detail = 'high'
 
+    # Note: temperature parameter is not supported by newer models like gpt-4o, gpt-4o-mini, and o1
+    # It is pre-set to a fixed value by OpenAI
+
     return {
         'model_name': model_name,
-        'temperature': temperature,
         'image_detail': image_detail
     }
 
@@ -513,46 +508,72 @@ def get_rate_limiter():
 def get_token_usage_stats():
     """
     Get token usage statistics from the rate limiter or directly from the stats file.
+    Always reads the latest data from the stats file to ensure all models are included.
 
     Returns:
         dict: Token usage statistics or None if rate limiter is not initialized and stats file doesn't exist
     """
-    # Try to get stats from rate limiter first
-    rate_limiter = get_rate_limiter()
-    if rate_limiter:
-        return rate_limiter.get_token_usage_stats()
+    # Get stats file path
+    stats_file = os.path.join(get_path_manager().logs_dir, 'token_usage_stats.json')
 
-    # If rate limiter is not available, try to read stats directly from file
+    # Check if stats file exists
+    if not os.path.exists(stats_file):
+        # Try to get stats from rate limiter if file doesn't exist
+        rate_limiter = get_rate_limiter()
+        if rate_limiter:
+            return rate_limiter.get_token_usage_stats()
+        return None
+
+    # Read stats directly from file to ensure we have the latest data
     try:
-        stats_file = os.path.join(get_path_manager().logs_dir, 'token_usage_stats.json')
-        if os.path.exists(stats_file):
-            with open(stats_file, 'r', encoding='utf-8') as f:
-                stats = json.load(f)
+        with open(stats_file, 'r', encoding='utf-8') as f:
+            stats = json.load(f)
 
-                # Calculate time-based metrics
-                current_time = time.time()
-                elapsed_time = current_time - stats.get('start_time', current_time)
-                elapsed_minutes = elapsed_time / 60
+            # Log the models found in the stats file
+            model_names = list(stats.get('model_usage', {}).keys())
+            logger.info(f"Loaded token usage statistics with models: {model_names}")
 
-                # Calculate rates
-                tokens_per_minute = stats.get('total_tokens', 0) / elapsed_minutes if elapsed_minutes > 0 else 0
-                requests_per_minute = stats.get('request_count', 0) / elapsed_minutes if elapsed_minutes > 0 else 0
+            # Calculate time-based metrics
+            current_time = time.time()
+            elapsed_time = current_time - stats.get('start_time', current_time)
+            elapsed_minutes = elapsed_time / 60
 
-                # Add calculated metrics to stats
-                stats.update({
-                    'tokens_per_minute': tokens_per_minute,
-                    'requests_per_minute': requests_per_minute,
-                    'token_usage_percent': 0.0,  # Not available when reading directly from file
-                    'request_usage_percent': 0.0,  # Not available when reading directly from file
-                    'elapsed_time': elapsed_time,
-                    'elapsed_minutes': elapsed_minutes,
-                    'current_time': current_time
-                })
+            # Calculate rates
+            tokens_per_minute = stats.get('total_tokens', 0) / elapsed_minutes if elapsed_minutes > 0 else 0
+            requests_per_minute = stats.get('request_count', 0) / elapsed_minutes if elapsed_minutes > 0 else 0
 
-                logger.info(f"Loaded token usage statistics directly from {stats_file}")
-                return stats
+            # Add calculated metrics to stats
+            stats.update({
+                'tokens_per_minute': tokens_per_minute,
+                'requests_per_minute': requests_per_minute,
+                'token_usage_percent': 0.0,  # Not available when reading directly from file
+                'request_usage_percent': 0.0,  # Not available when reading directly from file
+                'elapsed_time': elapsed_time,
+                'elapsed_minutes': elapsed_minutes,
+                'current_time': current_time
+            })
+
+            # If rate limiter exists, update its stats with the file data
+            rate_limiter = get_rate_limiter()
+            if rate_limiter:
+                # Update rate limiter with file data to keep it in sync
+                rate_limiter.total_prompt_tokens = stats.get('total_prompt_tokens', 0)
+                rate_limiter.total_completion_tokens = stats.get('total_completion_tokens', 0)
+                rate_limiter.total_tokens = stats.get('total_tokens', 0)
+                rate_limiter.request_count = stats.get('request_count', 0)
+                rate_limiter.error_count = stats.get('error_count', 0)
+                rate_limiter.model_usage = stats.get('model_usage', {})
+                rate_limiter.usage_history = stats.get('usage_history', [])
+
+            logger.info(f"Loaded token usage statistics directly from {stats_file}")
+            return stats
     except Exception as e:
         logger.error(f"Error loading token usage statistics from file: {str(e)}")
+
+        # Try to get stats from rate limiter as fallback
+        rate_limiter = get_rate_limiter()
+        if rate_limiter:
+            return rate_limiter.get_token_usage_stats()
 
     return None
 
@@ -560,26 +581,36 @@ def get_token_usage_stats():
 def get_token_usage_history():
     """
     Get token usage history from the rate limiter or directly from the stats file.
+    Always reads the latest data from the stats file to ensure all history entries are included.
 
     Returns:
         list: Token usage history or empty list if rate limiter is not initialized and stats file doesn't exist
     """
-    # Try to get history from rate limiter first
-    rate_limiter = get_rate_limiter()
-    if rate_limiter:
-        return rate_limiter.get_usage_history()
+    # Get stats file path
+    stats_file = os.path.join(get_path_manager().logs_dir, 'token_usage_stats.json')
 
-    # If rate limiter is not available, try to read history directly from file
+    # Check if stats file exists
+    if not os.path.exists(stats_file):
+        # Try to get history from rate limiter if file doesn't exist
+        rate_limiter = get_rate_limiter()
+        if rate_limiter:
+            return rate_limiter.get_usage_history()
+        return []
+
+    # Read history directly from file to ensure we have the latest data
     try:
-        stats_file = os.path.join(get_path_manager().logs_dir, 'token_usage_stats.json')
-        if os.path.exists(stats_file):
-            with open(stats_file, 'r', encoding='utf-8') as f:
-                stats = json.load(f)
-                history = stats.get('usage_history', [])
-                logger.info(f"Loaded token usage history directly from {stats_file}")
-                return history
+        with open(stats_file, 'r', encoding='utf-8') as f:
+            stats = json.load(f)
+            history = stats.get('usage_history', [])
+            logger.info(f"Loaded token usage history with {len(history)} entries from {stats_file}")
+            return history
     except Exception as e:
         logger.error(f"Error loading token usage history from file: {str(e)}")
+
+        # Try to get history from rate limiter as fallback
+        rate_limiter = get_rate_limiter()
+        if rate_limiter:
+            return rate_limiter.get_usage_history()
 
     return []
 
@@ -823,7 +854,7 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True, 
                     {
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": "Analyze this image in detail. Pay special attention to construction materials, architectural elements, and design features. Provide a comprehensive analysis that captures all relevant aspects of the wooden construction:"},
+                            {"type": "text", "text": "Analysiere dieses Bild im Detail und gib deine Antwort als JSON-Objekt zurück. Folge GENAU dem Schema, das in der Systemnachricht angegeben ist. Deine Antwort MUSS ein gültiges JSON-Objekt sein. Füge KEINEN Text außerhalb des JSON-Objekts hinzu. Verwende KEINE Markdown-Formatierung, Code-Blöcke oder anderen Text vor oder nach dem JSON-Objekt."},
                             {
                                 "type": "image_url",
                                 "image_url": {
@@ -834,8 +865,7 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True, 
                         ]
                     }
                 ],
-                max_tokens=MAX_TOKENS,
-                temperature=model_params['temperature']
+                max_completion_tokens=MAX_TOKENS
             )
 
             # Log and track actual token usage
@@ -850,19 +880,41 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True, 
                 # Update token usage statistics
                 rate_limiter.update_token_usage(prompt_tokens, completion_tokens, model_params['model_name'])
 
-            # Extract and parse JSON response
-            result_text = response.choices[0].message.content
-
-            # Try to parse JSON from the response
+            # Extract structured data from the function call response
             try:
-                # Find JSON object in the response (in case there's additional text)
-                json_start = result_text.find('{')
-                json_end = result_text.rfind('}') + 1
-                if json_start >= 0 and json_end > json_start:
-                    json_str = result_text[json_start:json_end]
-                    result = json.loads(json_str)
+                # Check if there's a tool call in the response
+                if hasattr(response.choices[0].message, 'tool_calls') and response.choices[0].message.tool_calls:
+                    # Get the function call arguments
+                    tool_call = response.choices[0].message.tool_calls[0]
+                    if tool_call.function.name == 'analyze_photo':
+                        # Parse the function arguments as JSON
+                        result = json.loads(tool_call.function.arguments)
+                        logger.debug(f"Successfully extracted structured data from function call")
+                    else:
+                        # Unexpected function name
+                        raise ValueError(f"Unexpected function name: {tool_call.function.name}")
                 else:
-                    result = json.loads(result_text)
+                    # Fallback to content parsing if no tool calls
+                    result_text = response.choices[0].message.content or ''
+                    logger.warning(f"No tool calls found in response, falling back to content parsing")
+
+                    # Clean up the response text to handle potential formatting issues
+                    # Remove any markdown code block markers
+                    result_text = re.sub(r'```json|```', '', result_text)
+
+                    # Find JSON object in the response (in case there's additional text)
+                    json_start = result_text.find('{')
+                    json_end = result_text.rfind('}') + 1
+
+                    if json_start >= 0 and json_end > json_start:
+                        json_str = result_text[json_start:json_end]
+                        # Log the extracted JSON string for debugging
+                        logger.debug(f"Extracted JSON string: {json_str[:100]}...")
+                        result = json.loads(json_str)
+                    else:
+                        # If no JSON object found, try to parse the entire response
+                        logger.warning(f"No JSON object found in response, trying to parse entire response")
+                        result = json.loads(result_text)
 
                 # If we got a valid JSON, return it
                 logger.info(f"Successfully analyzed photo: {os.path.basename(image_path)}")
@@ -871,9 +923,27 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True, 
             except json.JSONDecodeError:
                 logger.error(f"Failed to parse JSON from OpenAI response: {result_text}")
 
-                # If this is the last retry, return the error
+                # If this is the last retry, create a minimal valid JSON with error info
                 if retry_count == max_retries - 1:
-                    result = {"error": "Failed to parse JSON from response", "raw_response": result_text}
+                    # Create a minimal valid JSON that matches the expected schema
+                    result = {
+                        "Titel": "Fehler bei der Analyse",
+                        "Kunde": "none",
+                        "OrtohnePLZ": "none",
+                        "Projektkategorie": "Wohnbaute",  # Using a valid default choice
+                        "Bildinhalt": "Gesamtobjekt (Aussenansicht)",  # Using a valid default choice
+                        "Material": ["Holz"],  # Using a valid default choice
+                        "Holzart": "Fichte / Tanne",  # Using a valid default choice
+                        "Beschreibung": "Fehler bei der Analyse des Bildes. Bitte manuell überprüfen.",
+                        "Beschreibungfoto": "Fehler bei der Analyse.",
+                        "MediaServiceOCR": "",
+                        "Fertig": False,
+                        "Status": "Entwurf KI",
+                        "OriginalName": os.path.basename(image_path),
+                        "error": "Failed to parse JSON from response",
+                        "raw_response": result_text[:500]  # Truncate to avoid huge files
+                    }
+                    logger.warning(f"Created minimal valid JSON for failed analysis of {os.path.basename(image_path)}")
                     return result
 
                 # Otherwise, increment retry count and try again
