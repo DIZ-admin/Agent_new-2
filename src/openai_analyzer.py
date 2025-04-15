@@ -47,7 +47,6 @@ def get_model_params():
     - gpt-4o: Primary multimodal model with vision capabilities
     - gpt-4o-mini: Lighter version of GPT-4o with vision capabilities
     - gpt-4-turbo: Updated version of GPT-4 with vision capabilities
-    - o1: Advanced reasoning model with vision capabilities
     """
     # Get current config
     current_config = get_config()
@@ -55,7 +54,7 @@ def get_model_params():
     # Get model name
     model_name = os.environ.get('MODEL_NAME', '')
     if not model_name:
-        model_name = getattr(current_config.openai, 'model_name', 'gpt-4o')
+        model_name = getattr(current_config.openai, 'model_name', 'gpt-4-turbo')
 
     # Get image detail level
     image_detail = os.environ.get('IMAGE_DETAIL', '')
@@ -66,13 +65,36 @@ def get_model_params():
     if image_detail not in ['auto', 'low', 'high']:
         image_detail = 'high'
 
-    # Note: temperature parameter is not supported by newer models like gpt-4o, gpt-4o-mini, and o1
-    # It is pre-set to a fixed value by OpenAI
+    # Get max tokens
+    max_tokens = int(os.environ.get('MAX_TOKENS', MAX_TOKENS))
 
-    return {
+    # Determine which parameters to use based on model
+    params = {
         'model_name': model_name,
-        'image_detail': image_detail
+        'image_detail': image_detail,
+        'max_tokens': max_tokens
     }
+
+    # According to OpenAI API documentation:
+    # - All current models use max_completion_tokens instead of max_tokens
+    # - Only gpt-4-turbo supports temperature parameter
+    if model_name == 'gpt-4-turbo':
+        # gpt-4-turbo uses max_tokens and supports temperature
+        params['use_max_completion_tokens'] = False
+        params['use_temperature'] = True
+
+        # Get temperature for models that support it
+        temperature = os.environ.get('TEMPERATURE', '')
+        if not temperature:
+            temperature = getattr(current_config.openai, 'temperature', '0.2')
+        params['temperature'] = float(temperature)
+    else:
+        # All other models (gpt-4o, gpt-4o-mini) use max_completion_tokens
+        # and don't support temperature
+        params['use_max_completion_tokens'] = True
+        params['use_temperature'] = False
+
+    return params
 
 # Metadata schema file
 METADATA_SCHEMA_FILE = config.file.metadata_schema_file
@@ -103,6 +125,39 @@ def get_prompt_type():
 
     return prompt_type
 
+
+def get_user_message():
+    """
+    Get the user message from the configuration file.
+    This allows the user message to be updated without restarting the application.
+
+    Returns:
+        str: User message for OpenAI API
+    """
+    # Get config directory
+    config_dir = get_config().config_dir
+    user_message_path = os.path.join(config_dir, 'user_message.env')
+
+    if os.path.exists(user_message_path):
+        try:
+            # Load user message from file
+            with open(user_message_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            # Extract user message using regex
+            user_message_match = re.search(r'USER_MESSAGE="(.+?)"', content, re.DOTALL)
+            user_message = user_message_match.group(1) if user_message_match else ''
+
+            if user_message:
+                return user_message
+        except Exception as e:
+            logger.error(f"Error loading user message from {user_message_path}: {str(e)}")
+            logger.warning("Falling back to default user message")
+
+    # Fall back to default user message if file not found or error occurred
+    default_message = "Analysiere dieses Bild im Detail und gib deine Antwort als JSON-Objekt zurück. Folge GENAU dem Schema, das in der Systemnachricht angegeben ist. Deine Antwort MUSS ein gültiges JSON-Objekt sein. Füge KEINEN Text außerhalb des JSON-Objekts hinzu. Verwende KEINE Markdown-Formatierung, Code-Blöcke oder anderen Text vor oder nach dem JSON-Objekt."
+    logger.warning(f"Using default user message")
+    return default_message
 
 def get_openai_prompt_settings():
     """
@@ -357,6 +412,22 @@ class OpenAIRateLimiter:
         """
         with self.lock:
             self.error_count += 1
+            self.last_error_time = time.time()
+
+            # Update stats
+            if 'errors' not in self.stats:
+                self.stats['errors'] = 0
+            self.stats['errors'] += 1
+
+            # Track error type if provided
+            if error_type:
+                if 'error_types' not in self.stats:
+                    self.stats['error_types'] = {}
+
+                if error_type not in self.stats['error_types']:
+                    self.stats['error_types'][error_type] = 0
+
+                self.stats['error_types'][error_type] += 1
 
             # Save statistics after recording an error
             self._save_stats()
@@ -843,10 +914,12 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True, 
 
             # Create OpenAI API request
             # Using multimodal model to analyze the image
-            # Supported models: gpt-4o, gpt-4o-mini, gpt-4-turbo, o1
-            response = openai.chat.completions.create(
-                model=model_params['model_name'],
-                messages=[
+            # Supported models: gpt-4o, gpt-4o-mini, gpt-4-turbo
+
+            # Prepare base request parameters
+            request_params = {
+                'model': model_params['model_name'],
+                'messages': [
                     {
                         "role": "system",
                         "content": prompt
@@ -854,7 +927,7 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True, 
                     {
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": "Analysiere dieses Bild im Detail und gib deine Antwort als JSON-Objekt zurück. Folge GENAU dem Schema, das in der Systemnachricht angegeben ist. Deine Antwort MUSS ein gültiges JSON-Objekt sein. Füge KEINEN Text außerhalb des JSON-Objekts hinzu. Verwende KEINE Markdown-Formatierung, Code-Blöcke oder anderen Text vor oder nach dem JSON-Objekt."},
+                            {"type": "text", "text": get_user_message()},
                             {
                                 "type": "image_url",
                                 "image_url": {
@@ -865,8 +938,27 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True, 
                         ]
                     }
                 ],
-                max_completion_tokens=MAX_TOKENS
-            )
+                # Add response_format to ensure we get JSON back
+                'response_format': { "type": "json_object" }
+            }
+
+            # Add model-specific parameters according to OpenAI API documentation
+            if model_params.get('use_max_completion_tokens', False):
+                # For newer models like gpt-4o, gpt-4o-mini
+                request_params['max_completion_tokens'] = model_params['max_tokens']
+                logger.info(f"Using max_completion_tokens={model_params['max_tokens']} for model {model_params['model_name']}")
+            else:
+                # For older models like gpt-4-turbo
+                request_params['max_tokens'] = model_params['max_tokens']
+                logger.info(f"Using max_tokens={model_params['max_tokens']} for model {model_params['model_name']}")
+
+                # Add temperature only for models that support it
+                if model_params.get('use_temperature', False):
+                    request_params['temperature'] = model_params['temperature']
+                    logger.info(f"Using temperature={model_params['temperature']} for model {model_params['model_name']}")
+
+            # Make the API call
+            response = openai.chat.completions.create(**request_params)
 
             # Log and track actual token usage
             if hasattr(response, 'usage') and response.usage:
@@ -910,11 +1002,40 @@ def analyze_photo_with_openai(image_path, schema, max_retries=3, use_exif=True, 
                         json_str = result_text[json_start:json_end]
                         # Log the extracted JSON string for debugging
                         logger.debug(f"Extracted JSON string: {json_str[:100]}...")
-                        result = json.loads(json_str)
+
+                        # Try to fix common JSON formatting issues
+                        try:
+                            result = json.loads(json_str)
+                        except json.JSONDecodeError as e:
+                            logger.warning(f"Initial JSON parsing failed: {str(e)}. Attempting to fix JSON.")
+
+                            # Try to fix common issues with JSON formatting
+                            fixed_json_str = json_str
+
+                            # Fix unescaped quotes in strings
+                            fixed_json_str = re.sub(r'(?<!\\)"([^"]*?)(?<!\\)"\s*:\s*"([^"]*?)(?<!\\)([^"]*?)"', r'"\1":\"\2\3\"', fixed_json_str)
+
+                            # Fix missing quotes around property names
+                            fixed_json_str = re.sub(r'([{,])\s*(\w+)\s*:', r'\1"\2":', fixed_json_str)
+
+                            # Fix trailing commas in arrays and objects
+                            fixed_json_str = re.sub(r',\s*([\]}])', r'\1', fixed_json_str)
+
+                            # Try to parse the fixed JSON
+                            try:
+                                result = json.loads(fixed_json_str)
+                                logger.info(f"Successfully fixed and parsed JSON")
+                            except json.JSONDecodeError:
+                                # Just raise the original error
+                                raise
                     else:
                         # If no JSON object found, try to parse the entire response
                         logger.warning(f"No JSON object found in response, trying to parse entire response")
-                        result = json.loads(result_text)
+                        try:
+                            result = json.loads(result_text)
+                        except json.JSONDecodeError:
+                            # Just raise the original error
+                            raise
 
                 # If we got a valid JSON, return it
                 logger.info(f"Successfully analyzed photo: {os.path.basename(image_path)}")
@@ -1146,8 +1267,7 @@ def get_similar_photos_context(photo_path, max_similar=3):
         str: Context from similar photos or empty string if none found
     """
     try:
-        # Get the directory containing the photo
-        photo_dir = os.path.dirname(photo_path)
+        # Get the photo name without directory
         photo_name = os.path.basename(photo_path)
 
         # Look for analyzed photos in the same directory
