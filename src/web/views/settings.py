@@ -407,8 +407,8 @@ def clear_cache():
         registry = get_registry()
         registry.clear_registries()  # Clear registries instead of just reloading
 
-        flash("Cache and registry cleared successfully", "success")
-        logger.info("Cache and registry cleared via web interface")
+        flash("Cache and all registries (including file hashes) cleared successfully", "success")
+        logger.info("Cache and all registries (including file hashes) cleared via web interface")
     except Exception as e:
         flash(f"Error clearing cache: {str(e)}", "danger")
         logger.error(f"Error clearing cache: {str(e)}")
@@ -453,8 +453,8 @@ def clean_all_data():
         registry = get_registry()
         registry.clear_registries()  # Clear registries instead of just reloading
 
-        flash(f"Successfully cleaned {total_count} files from all data directories", "success")
-        logger.info(f"Cleaned {total_count} files from all data directories via web interface")
+        flash(f"Successfully cleaned {total_count} files from all data directories and cleared all registries (including file hashes)", "success")
+        logger.info(f"Cleaned {total_count} files from all data directories and cleared all registries (including file hashes) via web interface")
     except Exception as e:
         flash(f"Error cleaning all data: {str(e)}", "danger")
         logger.error(f"Error cleaning all data: {str(e)}")

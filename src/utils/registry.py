@@ -236,13 +236,15 @@ class FileRegistry:
 
     def clear_registries(self) -> None:
         """
-        Clear both registries.
+        Clear all registries including file hashes.
         """
         self.processed = {"files": {}, "last_updated": datetime.now().isoformat()}
         self.uploaded = {"files": {}, "last_updated": datetime.now().isoformat()}
+        self.file_hashes = {"hashes": {}, "last_updated": datetime.now().isoformat()}
         self._save_registry(self.processed, self.processed_file)
         self._save_registry(self.uploaded, self.uploaded_file)
-        logger.info("Registries cleared")
+        self._save_registry(self.file_hashes, self.file_hashes_file)
+        logger.info("All registries cleared including file hashes")
 
     def map_filename(self, original_filename: str, target_filename: str) -> None:
         """
