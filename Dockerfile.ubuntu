@@ -1,0 +1,58 @@
+FROM ubuntu:22.04
+
+# Set noninteractive installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Set timezone
+ENV TZ=Europe/Berlin
+
+# Install Python and required packages
+RUN apt-get update && apt-get install -y \
+    python3.10 \
+    python3-pip \
+    python3-venv \
+    tzdata \
+    curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python aliases
+RUN ln -sf /usr/bin/python3 /usr/bin/python && \
+    ln -sf /usr/bin/pip3 /usr/bin/pip
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements file
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application files
+COPY src/ /app/src/
+COPY config/ /app/config/
+
+# Create necessary directories
+RUN mkdir -p /app/data/downloads \
+    /app/data/metadata \
+    /app/data/analysis \
+    /app/data/upload \
+    /app/data/upload/metadata \
+    /app/data/uploaded \
+    /app/data/reports \
+    /app/data/registry \
+    /app/data/processed \
+    /app/logs
+
+# Set environment variables
+ENV PYTHONPATH="/app:${PYTHONPATH}"
+ENV TZ=Europe/Berlin
+ENV PYTHONUNBUFFERED=1
+ENV CONFIG_FILE=config/config.local.env
+
+# Expose web interface port
+EXPOSE 5000
+
+# Default command - start web interface
+CMD ["python", "-m", "src.web_server"]

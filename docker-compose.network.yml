@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  photo-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.ubuntu
+    container_name: photo-agent-network
+    volumes:
+      # Mount directories for data persistence between runs
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config:/app/config
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Berlin
+      - PYTHONUNBUFFERED=1
+      - CONFIG_FILE=config/config.local.env
+      - WEB_HOST=0.0.0.0
+      - WEB_PORT=5000
+      - FLASK_APP=src.web_server
+      - FLASK_ENV=development
+      - SECRET_KEY=local_development_secret_key
+    # Use host network mode for local network access
+    network_mode: "host"
+    # Default command - start web interface for easy interaction
+    command: python -m src.web_server
+    # Alternative commands for specific modules:
+    # command: python -m src.auto_process
+    # command: python -m src.metadata_schema
+    # command: python -m src.photo_metadata
+    # command: python -m src.openai_analyzer
+    # command: python -m src.metadata_generator
